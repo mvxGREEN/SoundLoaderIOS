@@ -10,27 +10,35 @@ import random
 import sys
 import os
 import requests
+import json
 from io import BytesIO
 from pathlib import Path
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 import ctypes
+from ctypes import c_void_p
 from ctypes.util import find_library
 from ctypes import cdll, CDLL, util, c_int64, c_int32, c_uint32, Structure, byref, POINTER
 import rubicon.objc as objc
-from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, ObjCInstance, objc_const, NSBundle
-from rubicon.objc.api import py_from_ns
-from rubicon.objc.runtime import load_library, send_message
+from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, ObjCInstance, objc_const, NSBundle, SEL
+from rubicon.objc.api import NSObject, Protocol, ObjCDelegate, py_from_ns
+from rubicon.objc.runtime import load_library, load_framework, send_message
 from rubicon.objc.api import *
 from rubicon.objc import *
 from rubicon.objc.runtime import *
+from rubicon.objc.runtime import NSError, NSStringEncoding
 import pillow
 import platform
 from pydub.utils import get_ffmpeg_path
 import pydub
 from pydub import AudioSegment
 from pydub.utils import get_ffmpeg_path
+
+
+# load frameworks
+load_framework('Foundation')
+load_framework('WebKit')
 
 
 # init objc libraries
@@ -40,8 +48,12 @@ cdll.LoadLibrary(util.find_library('Photos'))
 
 # create objc class objects
 NSURL = ObjCClass('NSURL')
+NSURLRequest = ObjCClass('NSURLRequest')
+NSURLSession = ObjCClass('NSURLSession')
+NSString = ObjCClass('NSString')
 NSError = ObjCClass('NSError')
 NSArray = ObjCClass('NSArray')
+NSData = ObjCClass('NSData')
 UIPasteboard = ObjCClass('UIPasteboard')
 AVAsset = ObjCClass('AVAsset')
 AVURLAsset = ObjCClass('AVURLAsset')
@@ -49,8 +61,12 @@ AVMutableComposition = ObjCClass('AVMutableComposition')
 AVAssetExportSession = ObjCClass('AVAssetExportSession')
 AVAssetTrack = ObjCClass('AVAssetTrack')
 
+WKWebView = ObjCClass('WKWebView')
+WKNavigationDelegate = Protocol('WKNavigationDelegate')
+WKWebViewConfiguration = ObjCClass('WKWebViewConfiguration')
 
-# get destination directory filepath based on os at runtime
+
+# get filepath to destination directory
 def get_dest_dir_path():
     # check OS
     if sys.platform == 'ios':
@@ -70,6 +86,7 @@ def get_dest_dir_path():
         return "¯\\_(ツ)_/¯"
 
 
+# get filepath to ffmpeg
 def get_bundled_ffmpeg_path():
     if platform.system() == 'Darwin':
         return os.path.join(os.path.dirname(__file__), 'ffmpeg')
@@ -146,6 +163,164 @@ def concat_chunk_files(file_paths, output_path):
         print(f"\nconcatenation complete: output_path={output_path}")
     except Exception as e:
         print(f"error exporting combined mp3: exception={e}")
+
+
+class WebViewDelegate(NSObject, metaclass=ObjCDelegate):
+    # Store intercepted URLs and the HTML result
+    intercepted_urls = []
+    html_content = None
+
+    # --- URL Interception ---
+    @objc_method
+    def webView_decidePolicyForNavigationAction_decisionHandler_(
+            self,
+            webView,
+            navigationAction,
+            decisionHandler
+    ):
+        # Get the URL of the request
+        request = navigationAction.request
+        url = request.URL.absoluteString
+
+        # Store the URL
+        print(f"Intercepted URL: {url}")
+        self.intercepted_urls.append(str(url))
+
+        # Allow the request to proceed (WKNavigationActionPolicyAllow = 1)
+        # decisionHandler(1)
+        # decisionHandler is a Block. We need to call it with the appropriate value.
+        # Note: In pure Objective-C, WKNavigationActionPolicyAllow is an enum value.
+        # You may need to verify the correct integer value for 'Allow' (which is 1)
+        decisionHandler(1)
+
+        # --- HTML Extraction ---
+
+    @objc_method
+    def webView_didFinishNavigation_(self, webView, navigation):
+        print("Page finished loading. Extracting HTML...")
+
+        # JavaScript code to get the entire page's HTML
+        js_get_html = "document.documentElement.outerHTML"
+
+        # Evaluate JavaScript in the web view
+        # The result comes back via a completion handler block
+        def completion_handler(html_string, error):
+            if error:
+                print(f"Error extracting HTML: {error}")
+            elif html_string:
+                # Store the extracted HTML as a Python string
+                self.html_content = str(html_string)
+                print(f"HTML extracted (Length: {len(self.html_content)})")
+
+            # This is where you would typically signal that the process is complete
+            # to prevent the Python script from exiting prematurely.
+            # E.g., setting a condition variable or stopping a run loop.
+            # For simplicity here, we rely on the final output.
+
+        # The evaluateJavaScript_completionHandler_ method expects a Block for the handler
+        Block(completion_handler)(js_get_html)
+
+
+# request json from url
+def request_json(url_string, callback):
+    # create nsstring object of url
+    url = NSURL.URLWithString(url_string)
+
+    # 2. Get the shared NSURLSession
+    session = NSURLSession.sharedSession
+
+    # 3. Define the completion handler block
+    # The block takes (NSData, NSURLResponse, NSError)
+    @Block
+    def completion_handler(data, response, error):
+        json_string = None
+        error_string = None
+
+        if error:
+            # An error occurred (e.g., network failure)
+            error_string = str(error.description)
+        elif data:
+            # Data was received, convert it to a Python string
+            # Use NSUTF8StringEncoding (4)
+            data_string = NSString.alloc().initWithData(data, encoding=4)
+            if data_string:
+                json_string = str(data_string)
+            else:
+                error_string = "Could not decode data as UTF-8 string."
+        else:
+            # This case might happen with a valid response but no data (e.g., 204 No Content)
+            error_string = "No data received."
+
+        # Call the Python callback function with the result
+        callback(json_string, error_string)
+
+    # 4. Create and start the data task
+    task = session.dataTaskWithURL(url, completionHandler=completion_handler)
+
+    # All tasks start in a suspended state, you must call resume()
+    task.resume()
+
+
+def handle_json_response(json_string, error_string):
+    """
+    The function to be called when the network request completes.
+    This will typically run on a background thread from the NSURLSession.
+    """
+    if error_string:
+        print(f"Error fetching data: {error_string}")
+        return
+
+    print("--- JSON Response (as String) ---")
+    print(json_string)
+
+    # You can now parse the string into a Python object if needed
+    try:
+        data_dict = json.loads(json_string)
+        print("\n--- Parsed JSON Key Example ---")
+        # Assuming the response is a dictionary and has a 'title' key for example
+        # print(f"Title: {data_dict.get('title', 'N/A')}")
+        print(f"Type of parsed data: {type(data_dict)}")
+    except json.JSONDecodeError as e:
+        print(f"\nError parsing JSON string: {e}")
+
+
+def load_url_in_webview(target_url):
+    # 1. Create the configuration
+    config = WKWebViewConfiguration.alloc().init()
+
+    # 2. Create the web view
+    frame = (0, 0, 500, 500)  # Simple arbitrary frame (x, y, width, height)
+    webview = WKWebView.alloc().initWithFrame_configuration_(frame, config)
+
+    # 3. Create and set the delegate
+    delegate = WebViewDelegate.alloc().init()
+    # WKWebView is an ObjCInstance, so its property setters are available
+    webview.navigationDelegate = delegate
+
+    # 4. Load the URL
+    url_obj = NSURL.URLWithString(target_url)
+    request_obj = NSURLRequest.requestWithURL(url_obj)
+    webview.loadRequest(request_obj)
+
+    # 5. Keep the webview and delegate alive while waiting for content
+    # In a full iOS app context (like BeeWare), the main app loop handles this.
+    # In a standalone script, you'd need a mechanism to keep the thread alive
+    # until the HTML is extracted (e.g., a run loop or a sleep loop).
+
+    # Example for demonstration (you'd need a robust loop in a real app):
+    import time
+    print("Loading web page...")
+    start_time = time.time()
+    while delegate.html_content is None and (time.time() - start_time) < 15:
+        time.sleep(0.5)
+        # Note: In a real rubicon-objc application, you would need to ensure
+        # that the main thread's run loop is active for delegate calls to work.
+
+    # 6. Return the results
+    return {
+        'urls': delegate.intercepted_urls,
+        'html': delegate.html_content
+    }
 
 
 class SoundLoader(toga.App):
@@ -422,15 +597,15 @@ class SoundLoader(toga.App):
         # update ui
         await self.show_downloading_layout()
 
-        # start downloading video
-        dl_v_task = asyncio.create_task(
+        # start downloading audio
+        dl_a_task = asyncio.create_task(
             download_audio(f"{self.url_input.value}",
                            get_dest_dir_path(),
                            f"{self.filename_input.value}"))
-        await dl_v_task
+        await dl_a_task
         print(f"finished video download!")
 
-        # TODO download audio
+        # TODO start download audio task
         # dl_a_task = asyncio.create_task(
         #    dl_audio_async(f"{self.url_input.value}",
         #                   get_dest_path(),
@@ -452,8 +627,63 @@ class SoundLoader(toga.App):
         await self.show_finished_layout()
         print("finished showing finished layout!")
 
-        # TODO export feature
+    # get html as string from webpage at URL
+    def get_html_from_url(url_string):
+        # 1. Create an NSURL object from the Python string
+        url = NSURL.URLWithString(url_string)
 
+        if url is None:
+            return f"Error: Could not create NSURL from '{url_string}'"
+
+        # 2. Create an NSError object placeholder (required by the method signature)
+        error = NSError.alloc().initWithDomain("", code=0, userInfo=None)
+
+        # 3. Use NSString's class method to get the content
+        # We use NSUTF8StringEncoding for the encoding, which is a common value.
+        html_content_objc = NSString.stringWithContentsOfURL(
+            url,
+            encoding=NSStringEncoding.NSUTF8StringEncoding,
+            error=error.ptr  # Pass a pointer to the error object
+        )
+
+        if html_content_objc is not None:
+            # The Objective-C NSString is automatically bridged to a Python str
+            return str(html_content_objc)
+        else:
+            # If loading fails, the error object might contain details
+            error_details = str(error.description) if error.description else "Unknown error"
+            return f"Error loading content: {error_details}"
+
+    def load_url_in_webview(target_url):
+        # create configuration
+        config = WKWebViewConfiguration.alloc().init()
+
+        # create webview
+        frame = (0, 0, 500, 500)  # Simple arbitrary frame (x, y, width, height)
+        webview = WKWebView.alloc().initWithFrame_configuration_(frame, config)
+
+        # create delegate, set as navigationdelegate for webview
+        delegate = WebViewDelegate.alloc().init()
+        # WKWebView is an ObjCInstance, so its property setters are available
+        webview.navigationDelegate = delegate
+
+        # load url
+        url_obj = NSURL.URLWithString(target_url)
+        request_obj = NSURLRequest.requestWithURL(url_obj)
+        webview.loadRequest(request_obj)
+
+        import time
+        print("Loading web page...")
+        start_time = time.time()
+        while delegate.html_content is None and (time.time() - start_time) < 15:
+            time.sleep(0.5)
+            # TODO ensure that the main thread's run loop is active for delegate calls to work
+
+        # return intercepted urls
+        return {
+            'urls': delegate.intercepted_urls,
+            'html': delegate.html_content
+        }
 
 def main():
     return SoundLoader()
