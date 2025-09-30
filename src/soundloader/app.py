@@ -37,7 +37,6 @@ from pydub.utils import get_ffmpeg_path
 load_library('AVFoundation')
 load_library('Foundation')
 cdll.LoadLibrary(util.find_library('Photos'))
-# TODO remove: AVFoundation = cdll.LoadLibrary(util.find_library('AVFoundation'))
 
 # create objc class objects
 NSURL = ObjCClass('NSURL')
