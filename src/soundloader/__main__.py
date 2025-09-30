@@ -1,4 +1,5 @@
+import asyncio
 from soundloader.app import main
 
 if __name__ == "__main__":
-    main().main_loop()
+    asyncio.run(main()).main_loop()
