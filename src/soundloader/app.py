@@ -71,6 +71,12 @@ def get_dest_dir_path():
         return "¯\\_(ツ)_/¯"
 
 
+def get_bundled_ffmpeg_path():
+    if platform.system() == 'Darwin':
+        return os.path.join(os.path.dirname(__file__), 'ffmpeg')
+    return get_ffmpeg_path()  # Use default path for other systems
+
+
 # remove sensitive characters from filename
 def sanitize_filename(filename):
     """Removes or replaces sensitive characters from a filename.
@@ -117,6 +123,9 @@ class SoundLoader(toga.App):
         toga.Font.register("FiraSans", "resources/FiraSans-Regular.ttf")
         toga.Font.register("FiraSansExtraLight", "resources/FiraSans-ExtraLight.ttf")
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
+
+        # set path to ffmpeg
+        os.environ["FFMPEG_PATH"] = get_bundled_ffmpeg_path()
 
         # update ui
         self.show_init_layout()
