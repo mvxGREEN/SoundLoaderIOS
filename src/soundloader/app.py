@@ -12,24 +12,32 @@ import os
 import requests
 from io import BytesIO
 from pathlib import Path
-from toga.validators import MinLength, StartsWith, Contains
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
+from toga.validators import MinLength, StartsWith, Contains
 import ctypes
 from ctypes.util import find_library
 from ctypes import cdll, CDLL, util, c_int64, c_int32, c_uint32, Structure, byref, POINTER
 import rubicon.objc as objc
-from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, CGRect, CGSize, CGPoint, ObjCInstance, objc_const
+from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, ObjCInstance, objc_const, NSBundle
 from rubicon.objc.api import py_from_ns
 from rubicon.objc.runtime import load_library, send_message
 from rubicon.objc.api import *
 from rubicon.objc import *
 from rubicon.objc.runtime import *
+import pillow
+import platform
+from pydub.utils import get_ffmpeg_path
+import pydub
+from pydub import AudioSegment
+from pydub.utils import get_ffmpeg_path
 
 
 # init objc libraries
+load_library('AVFoundation')
+load_library('Foundation')
 cdll.LoadLibrary(util.find_library('Photos'))
-AVFoundation = cdll.LoadLibrary(util.find_library('AVFoundation'))
+# TODO remove: AVFoundation = cdll.LoadLibrary(util.find_library('AVFoundation'))
 
 # create objc class objects
 NSURL = ObjCClass('NSURL')
@@ -403,8 +411,7 @@ class SoundLoader(toga.App):
         await self.show_finished_layout()
         print("finished showing finished layout!")
 
-        # save new video to photo library
-        save_audio(file_path_video)
+        # TODO export feature
 
 
 def main():
