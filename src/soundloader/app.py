@@ -5,7 +5,6 @@ A Cloud-to-MP3 Downloader for IOS
 import toga
 import asyncio
 import queue
-from asyncio import TaskGroup
 import re
 import random
 import sys
@@ -16,17 +15,17 @@ from pathlib import Path
 from toga.validators import MinLength, StartsWith, Contains
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
-from rubicon.objc.api import py_from_ns
+import ctypes
+from ctypes.util import find_library
 from ctypes import cdll, CDLL, util, c_int64, c_int32, c_uint32, Structure, byref, POINTER
+import rubicon.objc as objc
 from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, CGRect, CGSize, CGPoint, ObjCInstance, objc_const
 from rubicon.objc.api import py_from_ns
 from rubicon.objc.runtime import load_library, send_message
 from rubicon.objc.api import *
 from rubicon.objc import *
 from rubicon.objc.runtime import *
-import ctypes
-from ctypes.util import find_library
-import rubicon.objc as objc
+
 
 # init objc libraries
 cdll.LoadLibrary(util.find_library('Photos'))
