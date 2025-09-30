@@ -116,6 +116,39 @@ async def download_audio(audio_url, out, filename):
     print("starting download_audio")
 
 
+# concat chunk files into completed MP3 file
+def concat_chunk_files(file_paths, output_path):
+    if not file_paths:
+        print("error: no files provided to concat")
+        return
+
+    # init combined audio with first file
+    try:
+        combined_audio = AudioSegment.from_mp3(file_paths[0])
+    except Exception as e:
+        print(f"error loading first mp3 file: file_paths[0]={file_paths[0]}, exception={e}")
+        return
+
+    # loop through remaining chunk files and append them
+    for chunk_file in file_paths[1:]:
+        try:
+            next_audio = AudioSegment.from_mp3(chunk_file)
+            combined_audio += next_audio
+            print(f"successfully appended: {os.path.basename(chunk_file)}")
+        except Exception as e:
+            print(f"error appending file: mp3_file={chunk_file}. Details: {e}")
+            # TODO decide whether to exit or continue after error
+            continue
+
+    # try exporting combined audio to MP3 file
+    try:
+        # export() handles the encoding via ffmpeg
+        combined_audio.export(output_path, format="mp3")
+        print(f"\nconcatenation complete: output_path={output_path}")
+    except Exception as e:
+        print(f"error exporting combined mp3: exception={e}")
+
+
 class SoundLoader(toga.App):
     # startup
     def startup(self):
