@@ -21,9 +21,14 @@ test_sources = [
 ]
 
 requires = [
+    "requests",
+    "asyncio",
+    "pillow",
+    "pydub",
+    "rubicon-objc"
 ]
 test_requires = [
-    "pytest",
+    "pytest"
 ]
 
 [tool.briefcase.app.soundloader.macOS]
