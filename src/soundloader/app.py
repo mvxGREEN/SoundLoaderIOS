@@ -55,7 +55,7 @@ WKWebViewConfiguration = ObjCClass('WKWebViewConfiguration')
 
 
 # get filepath to destination directory
-def get_dest_dir_path():
+def get_dest_path():
     # check OS
     if sys.platform == 'ios':
         print("Running on IOS")
@@ -127,7 +127,7 @@ def extract_client_id():
 
 
 # TODO (1E) parse html for stream_url, thumbnail_url, and metadata
-def extract_audio_data(html):
+def extract_metadata(html):
     print(f"extract_audio_data: len(html)={len(html)}")
 
 
@@ -142,8 +142,8 @@ def handle_json_response(json):
 
 
 # TODO (2) asynchronously download audio
-async def download_audio(audio_url, dest_path):
-    print(f"start download_audio: audio_url={audio_url}, filename={dest_path}")
+async def download_audio(audio_url, dest_path, filename):
+    print(f"start download_audio: audio_url={audio_url}, filename={dest_path}, filename={filename}")
 
 
 # TODO (2A) asynchronously download m3u
@@ -194,7 +194,7 @@ class SoundLoader(toga.App):
 
         # url_box
         self.url_input = toga.TextInput(direction=ROW,
-                                        on_confirm=self.load_input,
+                                        on_confirm=self.start_load_audio,
                                         on_change=self.input_change,
                                         flex=1,
                                         validators=[StartsWith("https://", error_message="Please paste a valid URL",
@@ -205,7 +205,7 @@ class SoundLoader(toga.App):
         self.load_button = toga.Button(
             "Paste",
             direction=ROW,
-            on_press=self.load_input,
+            on_press=self.start_load_audio,
             margin=(0, 0, 0, 4),
         )
         self.load_button.style.visibility = 'visible'
@@ -238,7 +238,7 @@ class SoundLoader(toga.App):
         # download_box
         self.download_button = toga.Button(
             "Download",
-            on_press=self.download_input,
+            on_press=self.start_download_audio,
             margin=8,
         )
         download_box = toga.Box(children=[self.download_button], direction=COLUMN)
@@ -386,8 +386,10 @@ class SoundLoader(toga.App):
         print("clear_action")
         self.url_input.value = ""
 
-    # start running load processes
-    async def load_input(self, widget):
+    # on load click
+    async def start_load_audio(self, widget):
+        print("load button clicked (start_load_audio)")
+
         # hide keyboard
         self.app.main_window.content = self.app.main_window.content
 
@@ -425,12 +427,14 @@ class SoundLoader(toga.App):
                 thumbnail_url = thumbnail_url.replace("vi_webp", "vi")
                 thumbnail_url = thumbnail_url.replace(".webp", ".jpg")
 
+            # update ui
             self.show_preview_layout(filename, thumbnail_url)
-        # else:
         # TODO show error message on invalid input
 
-    # start running download processes
-    async def download_input(self, widget):
+    # on download click
+    async def start_download_audio(self, widget):
+        print("download button clicked (start_download_audio)")
+
         # hide keyboard
         self.app.main_window.content = self.app.main_window.content
 
@@ -440,24 +444,14 @@ class SoundLoader(toga.App):
         # start downloading audio
         dl_a_task = asyncio.create_task(
             download_audio(f"{self.url_input.value}",
-                           get_dest_dir_path(),
+                           get_dest_path(),
                            f"{self.filename_input.value}"))
         await dl_a_task
-        print(f"finished video download!")
-
-        # TODO start download audio task
-        # dl_a_task = asyncio.create_task(
-        #    dl_audio_async(f"{self.url_input.value}",
-        #                   get_dest_path(),
-        #                   f"{self.filename_input.value}",
-        #                   "1080",
-        #                   phook))
-        # await dl_a_task
-        # print(f"finished audio download!")
+        print(f"finished download_audio task")
 
         # TODO get chunk filepaths
         # file_path_chunks = get_dest_path() + f"{self.filename_input.value}"
-        file_path_dest = get_dest_dir_path() + f"{self.filename_input.value}" + ".mp3"
+        file_path_dest = get_dest_path() + f"{self.filename_input.value}" + ".mp3"
         print(
             f"file_path_dest={file_path_dest}")
 
@@ -466,38 +460,6 @@ class SoundLoader(toga.App):
         await self.show_finished_layout()
         print("finished showing finished layout!")
 
-
-
-    def load_url_in_webview(target_url):
-        # create configuration
-        config = WKWebViewConfiguration.alloc().init()
-
-        # create webview
-        frame = (0, 0, 500, 500)  # Simple arbitrary frame (x, y, width, height)
-        webview = WKWebView.alloc().initWithFrame_configuration_(frame, config)
-
-        # create delegate, set as navigationdelegate for webview
-        delegate = WebViewDelegate.alloc().init()
-        # WKWebView is an ObjCInstance, so its property setters are available
-        webview.navigationDelegate = delegate
-
-        # load url
-        url_obj = NSURL.URLWithString(target_url)
-        request_obj = NSURLRequest.requestWithURL(url_obj)
-        webview.loadRequest(request_obj)
-
-        import time
-        print("Loading web page...")
-        start_time = time.time()
-        while delegate.html_content is None and (time.time() - start_time) < 15:
-            time.sleep(0.5)
-            # TODO ensure that the main thread's run loop is active for delegate calls to work
-
-        # return intercepted urls
-        return {
-            'urls': delegate.intercepted_urls,
-            'html': delegate.html_content
-        }
 
 def main():
     return SoundLoader()
