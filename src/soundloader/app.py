@@ -23,7 +23,6 @@ from ctypes import cdll, CDLL, util, c_int64, c_int32, c_uint32, Structure, byre
 import rubicon.objc as objc
 from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, ObjCInstance, objc_const, SEL
 from rubicon.objc.api import NSObject, Protocol, py_from_ns
-from rubicon.objc.runtime import send_message
 from rubicon.objc.api import *
 from rubicon.objc import *
 from rubicon.objc.runtime import *
