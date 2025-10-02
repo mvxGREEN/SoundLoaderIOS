@@ -104,53 +104,17 @@ async def load_audio(input_url):
     el_twitter_player = "twitter:player"
 
 
-# (1A) get html from url as string
-async def get_html_from(url: str) -> str:
-    """
-    Asynchronously fetches the HTML content of a given URL.
-
-    Args:
-        url: The URL of the webpage to fetch.
-
-    Returns:
-        The HTML content as a string, or None if an error occurs.
-    """
-    try:
-        # Create an aiohttp ClientSession. It's recommended to use a context manager
-        # (the 'async with' block) for the session to ensure resources are properly released.
-        async with aiohttp.ClientSession() as session:
-            # Send an asynchronous GET request to the URL.
-            # The 'async with' block for the response ensures the connection is closed.
-            # Raise an exception for bad status codes (4xx or 5xx)
-            async with session.get(url) as response:
-                response.raise_for_status()
-
-                # Read the response content as text (HTML in this case).
-                html = await response.text()
-                return html
-
-    except ClientConnectorError as e:
-        # Handle connection-related errors (e.g., DNS failure, connection refused)
-        print(f"Connection Error for {url}: {e}")
-        return ""
-    except aiohttp.ClientResponseError as e:
-        # Handle HTTP errors (e.g., 404 Not Found, 500 Server Error)
-        print(f"HTTP Error for {url}: {e.status} {e.message}")
-        return ""
-    except Exception as e:
-        # Handle any other unexpected exceptions
-        print(f"An unexpected error occurred for {url}: {e}")
-        return ""
+# (1A)(class method) get html from url as string
 
 
-# TODO (1B) parse html for player_url
-def extract_player_url(html):
+# (1B) TODO parse html for player_url and extract html
+def extract_player_url(html) -> str:
     print(f"extract_player_url: len(html)={len(html)}")
 
+    return ""
 
-# TODO (1C) asynchronously load and extract html from player_url in webview
-async def load_in_webview(player_url):
-    print(f"start load_in_webview: player_url={player_url}")
+
+# (1C)(class method) load player_url in webview
 
 
 # TODO (1D) parse request urls client_id param
@@ -239,6 +203,13 @@ class SoundLoader(toga.App):
     def show_init_layout(self):
         # main_box
         self.main_box = toga.Box(direction=COLUMN)
+
+        # webview
+        self.webview = toga.WebView(
+            on_webview_load=self.on_page_loaded,
+            style=Pack(flex=0)
+        )
+        self.webview.style.visibility = 'hidden'
 
         # hint_box
         hint_label = toga.Label(
@@ -424,8 +395,8 @@ class SoundLoader(toga.App):
             # set load_button to clear
             self.load_button.text = "Clear"
 
-    # TODO uncomment
-    # paste copied text into url_input
+
+    # paste copied text into url_input TODO uncomment
     def paste_action(self):
         print("paste_action")
         # Get the general pasteboard instance
@@ -443,6 +414,71 @@ class SoundLoader(toga.App):
     def clear_action(self):
         print("clear_action")
         self.url_input.value = ""
+
+    # (1A) get html from url as string
+    async def get_html_from(self, url: str) -> str:
+        """
+        Asynchronously fetches the HTML content of a given URL.
+
+        Args:
+            url: The URL of the webpage to fetch.
+
+        Returns:
+            The HTML content as a string, or None if an error occurs.
+        """
+        try:
+            # Create an aiohttp ClientSession. It's recommended to use a context manager
+            # (the 'async with' block) for the session to ensure resources are properly released.
+            async with aiohttp.ClientSession() as session:
+                # Send an asynchronous GET request to the URL.
+                # The 'async with' block for the response ensures the connection is closed.
+                # Raise an exception for bad status codes (4xx or 5xx)
+                async with session.get(url) as response:
+                    response.raise_for_status()
+
+                    # Read the response content as text (HTML in this case).
+                    html = await response.text()
+                    return html
+
+        except ClientConnectorError as e:
+            # Handle connection-related errors (e.g., DNS failure, connection refused)
+            print(f"Connection Error for {url}: {e}")
+            return ""
+        except aiohttp.ClientResponseError as e:
+            # Handle HTTP errors (e.g., 404 Not Found, 500 Server Error)
+            print(f"HTTP Error for {url}: {e.status} {e.message}")
+            return ""
+        except Exception as e:
+            # Handle any other unexpected exceptions
+            print(f"An unexpected error occurred for {url}: {e}")
+            return ""
+
+    # (1C) load player_url in webview
+    def load_in_webview(self, player_url):
+        print(f"start load_in_webview: player_url={player_url}")
+        self.webview.url = player_url
+
+    # (1C) extract player_url from loaded webpage html
+    async def on_page_loaded(self, widget):
+        """
+        A handler that is invoked when the WebView finishes loading the page.
+        This is useful for updating other parts of the UI, like a status bar.
+        """
+        print(f"webview finished loading!")
+
+        # get global var
+        global player_url
+
+        # get html via js
+        js = "document.documentElement.outerHTML"
+        try:
+            html = await widget.evaluate_javascript(js)
+            player_url = extract_player_url(html)
+            print(f"found player_url={player_url}")
+        except Exception as e:
+            print(f"An error occurred while running JavaScript: {e}")
+
+        # TODO
 
     # on load click
     async def start_load_audio(self, widget):
