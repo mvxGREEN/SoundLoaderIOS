@@ -21,29 +21,17 @@ from ctypes import c_void_p
 from ctypes.util import find_library
 from ctypes import cdll, CDLL, util, c_int64, c_int32, c_uint32, Structure, byref, POINTER
 import rubicon.objc as objc
-from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, ObjCInstance, objc_const, NSBundle, SEL
-from rubicon.objc.api import NSObject, Protocol, ObjCDelegate, py_from_ns
-from rubicon.objc.runtime import load_library, load_framework, send_message
+from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, ObjCInstance, objc_const, SEL
+from rubicon.objc.api import NSObject, Protocol, py_from_ns
+from rubicon.objc.runtime import send_message
 from rubicon.objc.api import *
 from rubicon.objc import *
 from rubicon.objc.runtime import *
-from rubicon.objc.runtime import NSError, NSStringEncoding
-import pillow
-import platform
-from pydub.utils import get_ffmpeg_path
-import pydub
-from pydub import AudioSegment
-from pydub.utils import get_ffmpeg_path
-
-
-# load frameworks
-load_framework('Foundation')
-load_framework('WebKit')
 
 
 # init objc libraries
-load_library('AVFoundation')
-load_library('Foundation')
+cdll.LoadLibrary(util.find_library('AVFoundation'))
+cdll.LoadLibrary(util.find_library('Foundation'))
 cdll.LoadLibrary(util.find_library('Photos'))
 
 # create objc class objects
