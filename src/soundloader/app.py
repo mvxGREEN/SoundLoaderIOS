@@ -16,11 +16,11 @@ from pathlib import Path
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
-from rubicon.objc import ObjCClass
+#from rubicon.objc import ObjCClass
 
 
 # expose objc
-UIPasteboard = ObjCClass('UIPasteboard')
+#UIPasteboard = ObjCClass('UIPasteboard')
 
 
 # get filepath to destination directory
@@ -336,19 +336,20 @@ class SoundLoader(toga.App):
             # set load_button to clear
             self.load_button.text = "Clear"
 
-    # paste copied text from pasteboard into url_input
+    # TODO uncomment
+    # paste copied text into url_input
     def paste_action(self):
         print("paste_action")
         # Get the general pasteboard instance
-        pasteboard = UIPasteboard.generalPasteboard
+        #pasteboard = UIPasteboard.generalPasteboard
 
         # Get the string content from the pasteboard
-        pasted_text = pasteboard.string
+        #pasted_text = pasteboard.string
 
         # Check if there is any text to paste
-        if pasted_text:
+        #if pasted_text:
             # Set the value of the TextInput to the pasted text
-            self.url_input.value = pasted_text
+            #self.url_input.value = pasted_text
 
     # clear text from url_input
     def clear_action(self):
@@ -430,5 +431,5 @@ class SoundLoader(toga.App):
         print("finished showing finished layout!")
 
 
-def main():
+async def main():
     return SoundLoader()
