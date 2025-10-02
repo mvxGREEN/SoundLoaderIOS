@@ -101,37 +101,67 @@ def sanitize_filename(filename):
     return filename
 
 
-# TODO  1) asynchronously load audio
+# TODO (1) asynchronously load audio
 async def load_audio(audio_url):
-    print("start async load_audio")
+    print(f"start load_audio: audio_url={audio_url}")
 
 
-# TODO  A) get html from url as string
-async def get_html_from(url_string):
-    print("start async get_html_from")
+# TODO (1A) get html from url as string
+async def get_html_from(input_url):
+    print(f"start get_html_from: input_url={input_url}")
 
 
-# TODO  B) load player in webview
-def load_in_webview(target_url):
-    print("start load_in_webview")
+# TODO (1B) parse html for player_url
+def extract_player_url(html):
+    print(f"extract_player_url: len(html)={len(html)}")
 
 
-# TODO  C) asynchronously request json
-async def request_json(url_string, callback):
-    print("start request_json")
+# TODO (1C) asynchronously load and extract html from player_url in webview
+async def load_in_webview(player_url):
+    print(f"start load_in_webview: player_url={player_url}")
 
 
-# TODO  D) handle json response
-def handle_json_response(json_string, error_string):
-    print("start handle_json_response")
+# TODO (1D) parse request urls client_id param
+def extract_client_id():
+    print(f"extract_client_id")
 
 
-# TODO  2) asynchronously download audio
-async def download_audio(audio_url, out, filename):
-    print("start download_audio")
+# TODO (1E) parse html for stream_url, thumbnail_url, and metadata
+def extract_audio_data(html):
+    print(f"extract_audio_data: len(html)={len(html)}")
 
 
-# TODO concat chunks
+# TODO (1F) asynchronously request json w/ response handler
+async def request_json(full_stream_url, callback):
+    print(f"start request_json: full_stream_url={full_stream_url}")
+
+
+# TODO (1G) parse json for playlist_url
+def handle_json_response(json):
+    print(f"start handle_json_response: json={json}")
+
+
+# TODO (2) asynchronously download audio
+async def download_audio(audio_url, dest_path):
+    print(f"start download_audio: audio_url={audio_url}, filename={dest_path}")
+
+
+# TODO (2A) asynchronously download m3u
+async def download_m3u(playlist_url, dest_path):
+    print(f"start download_m3u: playlist_url={playlist_url}")
+
+
+# TODO (2B) parse m3u for chunk_urls
+def extract_chunk_urls(m3u_filepath):
+    print(f"extract_chunk_urls: m3u_filepath={m3u_filepath}")
+
+
+# TODO (2C) asynchronously download chunks
+async def download_chunks(chunk_urls, dest_path):
+    print(f"start download_chunks: len(chunk_urls)={len(chunk_urls)}")
+
+
+# TODO (2D) concat chunks into mp3 w/ thumbnail and metadata
 def concat_chunk_files(chunk_dir_path, dest_filepath):
     print("start concat_chunk_files")
 
