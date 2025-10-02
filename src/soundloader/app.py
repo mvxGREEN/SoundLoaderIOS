@@ -5,6 +5,7 @@ A Cloud-to-MP3 Downloader for IOS
 import toga
 import asyncio
 import aiohttp
+from aiohttp import ClientConnectorError
 import queue
 import re
 import random
@@ -20,7 +21,6 @@ from toga.validators import MinLength, StartsWith, Contains
 
 # TODO uncommnt
 #from rubicon.objc import ObjCClass
-
 
 # expose objc TODO uncomment
 #UIPasteboard = ObjCClass('UIPasteboard')
@@ -78,14 +78,54 @@ async def load_audio(input_url):
     print(f"start load_audio: input_url={input_url}")
 
     # get html as string
-    await get_html_from(input_url)
+    html = await get_html_from(input_url)
+    print("finished get_html_from")
+
+    # exit if html too small TODO show error message
+    if len(html) < 300:
+        print("exiting load_audio; len(html) < 300")
+        return
+
+    # parse html for player url
 
 
-# TODO (1A) get html from url as string
-async def get_html_from(input_url):
-    print(f"start get_html_from: input_url={input_url}")
+# (1A) get html from url as string
+async def get_html_from(url: str) -> str:
+    """
+    Asynchronously fetches the HTML content of a given URL.
 
-    #
+    Args:
+        url: The URL of the webpage to fetch.
+
+    Returns:
+        The HTML content as a string, or None if an error occurs.
+    """
+    try:
+        # Create an aiohttp ClientSession. It's recommended to use a context manager
+        # (the 'async with' block) for the session to ensure resources are properly released.
+        async with aiohttp.ClientSession() as session:
+            # Send an asynchronous GET request to the URL.
+            # The 'async with' block for the response ensures the connection is closed.
+            # Raise an exception for bad status codes (4xx or 5xx)
+            async with session.get(url) as response:
+                response.raise_for_status()
+
+                # Read the response content as text (HTML in this case).
+                html = await response.text()
+                return html
+
+    except ClientConnectorError as e:
+        # Handle connection-related errors (e.g., DNS failure, connection refused)
+        print(f"Connection Error for {url}: {e}")
+        return ""
+    except aiohttp.ClientResponseError as e:
+        # Handle HTTP errors (e.g., 404 Not Found, 500 Server Error)
+        print(f"HTTP Error for {url}: {e.status} {e.message}")
+        return ""
+    except Exception as e:
+        # Handle any other unexpected exceptions
+        print(f"An unexpected error occurred for {url}: {e}")
+        return ""
 
 
 # TODO (1B) parse html for player_url
