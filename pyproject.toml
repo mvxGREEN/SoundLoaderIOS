@@ -23,7 +23,8 @@ test_sources = [
 requires = [
     "requests",
     "asyncio",
-    "rubicon-objc"
+    "rubicon-objc",
+    "aiohttp"
 ]
 test_requires = [
     "pytest"

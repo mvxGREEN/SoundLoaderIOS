@@ -16,14 +16,16 @@ from pathlib import Path
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
+
+# TODO uncommnt
 #from rubicon.objc import ObjCClass
 
 
-# expose objc
+# expose objc TODO uncomment
 #UIPasteboard = ObjCClass('UIPasteboard')
 
 
-# get filepath to destination directory
+# get absolute path to destination directory
 def get_dest_path():
     # check OS
     if sys.platform == 'ios':
@@ -43,7 +45,7 @@ def get_dest_path():
         return "¯\\_(ツ)_/¯"
 
 
-# remove sensitive characters from filename
+# remove prohibited characters from filename
 def sanitize_filename(filename):
     """Removes or replaces sensitive characters from a filename.
 
@@ -71,13 +73,18 @@ def sanitize_filename(filename):
 
 
 # TODO (1) asynchronously load audio
-async def load_audio(audio_url):
-    print(f"start load_audio: audio_url={audio_url}")
+async def load_audio(input_url):
+    print(f"start load_audio: input_url={input_url}")
+
+    # get html as string
+    await get_html_from(input_url)
 
 
 # TODO (1A) get html from url as string
 async def get_html_from(input_url):
     print(f"start get_html_from: input_url={input_url}")
+
+    #
 
 
 # TODO (1B) parse html for player_url
