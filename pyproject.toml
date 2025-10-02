@@ -24,7 +24,8 @@ requires = [
     "requests",
     "asyncio",
     "rubicon-objc",
-    "aiohttp"
+    "aiohttp",
+    "httpx"
 ]
 test_requires = [
     "pytest"
