@@ -39,7 +39,7 @@ chunk_urls = [""]
 track_filename = ""
 thumbnail_url = ""
 track_title = ""
-track_id = ""
+track_artist = ""
 
 
 # TODO uncommnt
@@ -91,15 +91,6 @@ def create_temp_dir():
 async def load_audio(input_url):
     print(f"start load_audio: input_url={input_url}")
 
-    # get html as string
-    html = await get_html_from(input_url)
-    print("finished get_html_from")
-
-    # exit if html too small TODO show error message
-    if len(html) < 300:
-        print("exiting load_audio; len(html) < 300")
-        return
-
     # get player_url
     el_twitter_player = "twitter:player"
 
@@ -123,8 +114,10 @@ def extract_client_id():
 
 
 # TODO (1E) parse html for stream_url, thumbnail_url, and metadata
-def extract_metadata(html):
+def extract_info(html) -> str:
     print(f"extract_audio_data: len(html)={len(html)}")
+
+    return ""
 
 
 # TODO (1F) asynchronously request json w/ response handler
@@ -470,6 +463,7 @@ class SoundLoader(toga.App):
         global player_url
 
         # get html via js
+        html = ""
         js = "document.documentElement.outerHTML"
         try:
             html = await widget.evaluate_javascript(js)
@@ -477,8 +471,53 @@ class SoundLoader(toga.App):
             print(f"found player_url={player_url}")
         except Exception as e:
             print(f"An error occurred while running JavaScript: {e}")
+        finally:
+            if len(html) < 300:
+                res = extract_info(html)
 
-        # TODO
+                # random id for filename to prevent overwrite
+                #filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
+
+                # separate res into stream_url, track_filename, and thumbnail_url
+                global stream_url
+                global thumbnail_url
+                global track_filename
+                index_div1 = res.index("|||")
+                index_div2 = res.rindex("|||")
+                stream_url = res[:index_div1]
+                track_filename = res[index_div1+3:index_div2]
+                thumbnail_url = res[index_div2+3:]
+                print(f"extract_info res:\nstream_url={stream_url}"
+                    f"\ntrack_filename={track_filename}"
+                    f"\nthumbnail_url={thumbnail_url}")
+
+                # separate track_filename into track_title and track_artist
+                global track_title
+                global track_artist
+                index_div3 = track_filename.index("__")
+                track_title = track_filename[:index_div3]
+                track_artist = track_artist[index_div3+3:]
+                print(f"extract_info res:\ntrack_title={track_title}"
+                      f"\ntrack_artist={track_artist}")
+
+                # sanitize filename
+                track_filename = sanitize_filename(track_filename)
+
+                # convert webp thumbnail to jpg
+                if thumbnail_url.endswith(".webp"):
+                    thumbnail_url = thumbnail_url.replace("vi_webp", "vi")
+                    thumbnail_url = thumbnail_url.replace(".webp", ".jpg")
+
+                # TODO get client_id
+
+                # TODO request json
+
+                # update ui
+                self.show_preview_layout(track_filename, thumbnail_url)
+
+            else:
+                # TODO show error message
+                return
 
     # on load click
     async def start_load_audio(self, widget):
@@ -496,34 +535,26 @@ class SoundLoader(toga.App):
         if not self.url_input.value:
             self.paste_action()
 
-        # validate input
+        # validate input TODO show error message on invalid input
         if "https://" in self.url_input.value and self.url_input.value.count("/") >= 3:
             # show loading ui
             self.show_loading_layout()
 
-            # await load audio task
-            load_task = asyncio.create_task(
-                load_audio(f"{self.url_input.value}"))
-            info = await load_task
+            # await player_url
+            input_url = self.url_input.value
+            html = await self.get_html_from(input_url)
+            print("finished get_html_from")
 
-            # format file info
-            filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
-            index_div1 = info.index("|||")
-            index_div2 = info.rindex("|||")
-            title = info[:index_div1]
-            filename = filename_id + sanitize_filename(title[0:23])
-            ext = info[index_div1 + 3:index_div2]
-            thumbnail_url = info[index_div2 + 3:]
-            print(f"loaded audio info:\ntitle={title}\nfilename={filename}\next={ext}\nthumbnail_url={thumbnail_url}")
+            # exit if html too small TODO show error message
+            if len(html) < 300:
+                print("exiting load_audio; html too short")
+                return
 
-            # convert webp thumbnail to jpg
-            if thumbnail_url.endswith(".webp"):
-                thumbnail_url = thumbnail_url.replace("vi_webp", "vi")
-                thumbnail_url = thumbnail_url.replace(".webp", ".jpg")
+            # extract player url
+            player_url = extract_player_url(html)
 
-            # update ui
-            self.show_preview_layout(filename, thumbnail_url)
-        # TODO show error message on invalid input
+            # load player in webiew
+            self.load_in_webview(player_url)
 
     # on download click
     async def start_download_audio(self, widget):
