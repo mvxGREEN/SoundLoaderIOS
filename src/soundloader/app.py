@@ -87,49 +87,6 @@ def create_temp_dir():
         print(f"Parent directory for '{docs_path}' does not exist.")
 
 
-# TODO (1) asynchronously load audio
-async def load_audio(input_url):
-    print(f"start load_audio: input_url={input_url}")
-
-    # get player_url
-    el_twitter_player = "twitter:player"
-
-
-# (1A)(class method) get html from url as string
-
-
-# (1B) TODO parse html for player_url and extract html
-def extract_player_url(html) -> str:
-    print(f"extract_player_url: len(html)={len(html)}")
-
-    return ""
-
-
-# (1C)(class method) load player_url in webview
-
-
-# TODO (1D) parse request urls client_id param
-def extract_client_id():
-    print(f"extract_client_id")
-
-
-# TODO (1E) parse html for stream_url, thumbnail_url, and metadata
-def extract_info(html) -> str:
-    print(f"extract_audio_data: len(html)={len(html)}")
-
-    return ""
-
-
-# TODO (1F) asynchronously request json w/ response handler
-async def request_json(full_stream_url, callback):
-    print(f"start request_json: full_stream_url={full_stream_url}")
-
-
-# TODO (1G) parse json for playlist_url
-def handle_json_response(json):
-    print(f"start handle_json_response: json={json}")
-
-
 # TODO (2) asynchronously download audio
 async def download_audio(audio_url, dest_path, filename):
     print(f"start download_audio: audio_url={audio_url}, filename={dest_path}, filename={filename}")
@@ -451,7 +408,7 @@ class SoundLoader(toga.App):
         print(f"start load_in_webview: player_url={player_url}")
         self.webview.url = player_url
 
-    # (1C) extract player_url from loaded webpage html
+    # (1D) extract player_url from loaded webpage html
     async def on_page_loaded(self, widget):
         """
         A handler that is invoked when the WebView finishes loading the page.
@@ -467,13 +424,11 @@ class SoundLoader(toga.App):
         js = "document.documentElement.outerHTML"
         try:
             html = await widget.evaluate_javascript(js)
-            player_url = extract_player_url(html)
-            print(f"found player_url={player_url}")
         except Exception as e:
             print(f"An error occurred while running JavaScript: {e}")
         finally:
             if len(html) < 300:
-                res = extract_info(html)
+                res = self.extract_info(html)
 
                 # random id for filename to prevent overwrite
                 #filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
@@ -508,16 +463,77 @@ class SoundLoader(toga.App):
                     thumbnail_url = thumbnail_url.replace("vi_webp", "vi")
                     thumbnail_url = thumbnail_url.replace(".webp", ".jpg")
 
-                # TODO get client_id
+                # get client_id
+                global client_id
+                client_id = await self.get_client_id_from("https://a-v2.sndcdn.com/assets/0-2e3ca6a5.js")
 
-                # TODO request json
+                global stream_url
+                global full_stream_url
+                full_stream_url = stream_url + "?" + client_id + "&app_version=1759307428&app_locale=en"
+                print(f"full_stream_url={full_stream_url}")
 
-                # update ui
-                self.show_preview_layout(track_filename, thumbnail_url)
-
+                # request json with handler
+                await self.request_json(full_stream_url, self.handle_json_response)
             else:
                 # TODO show error message
                 return
+
+    # (1E) get client_id
+    async def get_client_id_from(self, js_url) -> str:
+        try:
+            # execute js request
+            response = await self.loop.run_in_executor(
+                None,
+                lambda: requests.get(js_url, timeout=10)
+            )
+
+            # check for success
+            response.raise_for_status()
+
+            # get js as string
+            js_content = response.text
+
+            # extract client_id
+            if 'client_id=' in js_content:
+                start = js_content.find('client_id=')+10
+                c_id = js_content[start]
+                c_id = c_id[c_id.find('"')]
+                print(f"found client_id! c_id={c_id}")
+                return c_id
+            return ""
+
+        except requests.exceptions.RequestException as e:
+            # Handle network errors, timeouts, bad status codes, etc.
+            self.label.text = f"Error fetching JS: {e}"
+            print(f"Error: {e}")
+            # TODO show error message
+            return ""
+
+        except Exception as e:
+            # Handle other potential exceptions
+            self.label.text = f"An unexpected error occurred: {e}"
+            # TODO show error message
+            print(f"Unexpected Error: {e}")
+
+    # (1B) TODO parse html for player_url and extract html
+    def extract_player_url(self, html) -> str:
+        print(f"extract_player_url: len(html)={len(html)}")
+
+        return ""
+
+    # (1H) request json w/ response handler
+    async def request_json(self, full_stream_url, callback):
+        print(f"start request_json: full_stream_url={full_stream_url}")
+
+    # parse json response
+    def handle_json_response(self, json):
+        print(f"start handle_json_response: json={json}")
+
+        # TODO extract playlist_url
+        global playlist_url
+
+        # update ui
+        self.show_preview_layout(track_filename, thumbnail_url)
 
     # on load click
     async def start_load_audio(self, widget):
