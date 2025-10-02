@@ -19,6 +19,16 @@ from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 
+# constants
+twitter_player_element = "twitter:player"
+base_thumbnail_url = "i1.sndcdn.com/art"
+base_thumbnail_url_alt = "i1.sndcdn.com/a"
+flag_start_stream_id = "media/soundcloud:tracks:"
+flag_end_stream_id = "/stream"
+stream_url_base = "https://api-v2.soundcloud.com/media/soundcloud:tracks:"
+stream_url_end = "/stream/hls"
+flag_client_id = "client_id:u?"
+
 # TODO uncommnt
 #from rubicon.objc import ObjCClass
 
@@ -86,7 +96,8 @@ async def load_audio(input_url):
         print("exiting load_audio; len(html) < 300")
         return
 
-    # parse html for player url
+    # get player_url
+    el_twitter_player = "twitter:player"
 
 
 # (1A) get html from url as string
