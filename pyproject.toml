@@ -23,8 +23,6 @@ test_sources = [
 requires = [
     "requests",
     "asyncio",
-    "pillow",
-    "pydub",
     "rubicon-objc"
 ]
 test_requires = [
@@ -197,4 +195,3 @@ requires = [
     "toga-web~=0.5.0",
 ]
 style_framework = "Shoelace v2.3"
-
