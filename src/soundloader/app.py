@@ -16,41 +16,11 @@ from pathlib import Path
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
-import ctypes
-from ctypes import c_void_p
-from ctypes.util import find_library
-from ctypes import cdll, CDLL, util, c_int64, c_int32, c_uint32, Structure, byref, POINTER
-import rubicon.objc as objc
-from rubicon.objc import ObjCClass, ObjCBlock, Block, objc_method, ObjCInstance, objc_const, SEL
-from rubicon.objc.api import NSObject, Protocol, py_from_ns
-from rubicon.objc.api import *
-from rubicon.objc import *
-from rubicon.objc.runtime import *
+from rubicon.objc import ObjCClass
 
 
-# init objc libraries
-cdll.LoadLibrary(util.find_library('AVFoundation'))
-cdll.LoadLibrary(util.find_library('Foundation'))
-cdll.LoadLibrary(util.find_library('Photos'))
-
-# create objc class objects
-NSURL = ObjCClass('NSURL')
-NSURLRequest = ObjCClass('NSURLRequest')
-NSURLSession = ObjCClass('NSURLSession')
-NSString = ObjCClass('NSString')
-NSError = ObjCClass('NSError')
-NSArray = ObjCClass('NSArray')
-NSData = ObjCClass('NSData')
+# expose objc
 UIPasteboard = ObjCClass('UIPasteboard')
-AVAsset = ObjCClass('AVAsset')
-AVURLAsset = ObjCClass('AVURLAsset')
-AVMutableComposition = ObjCClass('AVMutableComposition')
-AVAssetExportSession = ObjCClass('AVAssetExportSession')
-AVAssetTrack = ObjCClass('AVAssetTrack')
-
-WKWebView = ObjCClass('WKWebView')
-WKNavigationDelegate = Protocol('WKNavigationDelegate')
-WKWebViewConfiguration = ObjCClass('WKWebViewConfiguration')
 
 
 # get filepath to destination directory
