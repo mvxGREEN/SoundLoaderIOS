@@ -19,15 +19,28 @@ from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 
-# constants
-twitter_player_element = "twitter:player"
-base_thumbnail_url = "i1.sndcdn.com/art"
-base_thumbnail_url_alt = "i1.sndcdn.com/a"
-flag_start_stream_id = "media/soundcloud:tracks:"
-flag_end_stream_id = "/stream"
-stream_url_base = "https://api-v2.soundcloud.com/media/soundcloud:tracks:"
-stream_url_end = "/stream/hls"
-flag_client_id = "client_id:u?"
+# global constants
+TWITTER_PLAYER = "twitter:player"
+BASE_THUMBNAIL_URL = "i1.sndcdn.com/art"
+BASE_THUMBNAIL_URL_ALT = "i1.sndcdn.com/a"
+FLAG_BEGIN_STREAM_ID = "media/soundcloud:tracks:"
+FLAG_END_STREAM_ID = "/stream"
+STREAM_URL_BASE = "https://api-v2.soundcloud.com/media/soundcloud:tracks:"
+STREAM_URL_END = "/stream/hls"
+FLAG_CLIENT_ID = "client_id:u?"
+
+# global variables
+player_url = ""
+client_id = ""
+stream_url = ""
+full_stream_url = ""
+playlist_url = ""
+chunk_urls = [""]
+track_filename = ""
+thumbnail_url = ""
+track_title = ""
+track_id = ""
+
 
 # TODO uncommnt
 #from rubicon.objc import ObjCClass
@@ -56,31 +69,22 @@ def get_dest_path():
         return "¯\\_(ツ)_/¯"
 
 
-# remove prohibited characters from filename
-def sanitize_filename(filename):
-    """Removes or replaces sensitive characters from a filename.
+# TODO get absolute path to temp directory
+def get_temp_path():
+    # append 'soundloader_temp' to destination directory
+    return get_dest_path() + 'temp'
 
-    Args:
-        filename (str): The filename to sanitize.
 
-    Returns:
-        str: The sanitized filename.
-    """
-
-    # 1. Remove or replace characters that are invalid across platforms
-    filename = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '_', filename)
-
-    # 2. Remove or replace characters that might cause issues with specific OS
-    filename = filename.replace(' ', '_')  # replace spaces
-    filename = filename.strip('. ')  # Remove leading/trailing spaces and dots
-
-    # 3. Remove potentially problematic characters
-    filename = re.sub(r'[,;!@#\$%^&()+]', '', filename)
-
-    # 4. Normalize Unicode characters
-    filename = filename.encode('ascii', 'ignore').decode('ascii')
-
-    return filename
+# create temp directory for playlist and chunk files
+def create_temp_dir():
+    docs_path = get_dest_path()
+    try:
+        os.mkdir(docs_path)
+        print(f"Directory '{docs_path}' created successfully.")
+    except FileExistsError:
+        print(f"Directory '{docs_path}' already exists.")
+    except FileNotFoundError:
+        print(f"Parent directory for '{docs_path}' does not exist.")
 
 
 # TODO (1) asynchronously load audio
@@ -194,6 +198,33 @@ def concat_chunk_files(chunk_dir_path, dest_filepath):
     print("start concat_chunk_files")
 
 
+# remove prohibited characters from filename
+def sanitize_filename(filename):
+    """Removes or replaces sensitive characters from a filename.
+
+    Args:
+        filename (str): The filename to sanitize.
+
+    Returns:
+        str: The sanitized filename.
+    """
+
+    # 1. Remove or replace characters that are invalid across platforms
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '_', filename)
+
+    # 2. Remove or replace characters that might cause issues with specific OS
+    filename = filename.replace(' ', '_')  # replace spaces
+    filename = filename.strip('. ')  # Remove leading/trailing spaces and dots
+
+    # 3. Remove potentially problematic characters
+    filename = re.sub(r'[,;!@#\$%^&()+]', '', filename)
+
+    # 4. Normalize Unicode characters
+    filename = filename.encode('ascii', 'ignore').decode('ascii')
+
+    return filename
+
+
 class SoundLoader(toga.App):
     # startup
     def startup(self):
@@ -204,8 +235,6 @@ class SoundLoader(toga.App):
 
         # update ui
         self.show_init_layout()
-
-        # request permissions
 
     def show_init_layout(self):
         # main_box
@@ -478,14 +507,15 @@ class SoundLoader(toga.App):
         await dl_a_task
         print(f"finished download_audio task")
 
-        # TODO get chunk filepaths
-        # file_path_chunks = get_dest_path() + f"{self.filename_input.value}"
+        # get filepath of destination
         file_path_dest = get_dest_path() + f"{self.filename_input.value}" + ".mp3"
-        print(
-            f"file_path_dest={file_path_dest}")
+        print(f"file_path_dest={file_path_dest}")
 
-        # TODO concat chunk files
+        # TODO get filepaths of chunks
 
+        # TODO concat chunks to destination
+
+        # update ui
         await self.show_finished_layout()
         print("finished showing finished layout!")
 
