@@ -74,13 +74,6 @@ def get_dest_dir_path():
         return "¯\\_(ツ)_/¯"
 
 
-# get filepath to ffmpeg
-def get_bundled_ffmpeg_path():
-    if platform.system() == 'Darwin':
-        return os.path.join(os.path.dirname(__file__), 'ffmpeg')
-    return get_ffmpeg_path()  # Use default path for other systems
-
-
 # remove sensitive characters from filename
 def sanitize_filename(filename):
     """Removes or replaces sensitive characters from a filename.
@@ -108,207 +101,39 @@ def sanitize_filename(filename):
     return filename
 
 
-# start loading audio file(s) asynchronously
+# TODO  1) asynchronously load audio
 async def load_audio(audio_url):
-    # TODO implement loading processes
-    print("starting load_audio")
+    print("start async load_audio")
 
 
-# start downloading audio file(s) asynchronously
-async def download_audio(audio_url, out, filename):
-    # TODO implement downloading processes
-    print("starting download_audio")
+# TODO  A) get html from url as string
+async def get_html_from(url_string):
+    print("start async get_html_from")
 
 
-# concat chunk files into completed MP3 file
-def concat_chunk_files(file_paths, output_path):
-    if not file_paths:
-        print("error: no files provided to concat")
-        return
-
-    # init combined audio with first file
-    try:
-        combined_audio = AudioSegment.from_mp3(file_paths[0])
-    except Exception as e:
-        print(f"error loading first mp3 file: file_paths[0]={file_paths[0]}, exception={e}")
-        return
-
-    # loop through remaining chunk files and append them
-    for chunk_file in file_paths[1:]:
-        try:
-            next_audio = AudioSegment.from_mp3(chunk_file)
-            combined_audio += next_audio
-            print(f"successfully appended: {os.path.basename(chunk_file)}")
-        except Exception as e:
-            print(f"error appending file: mp3_file={chunk_file}. Details: {e}")
-            # TODO decide whether to exit or continue after error
-            continue
-
-    # try exporting combined audio to MP3 file
-    try:
-        # export() handles the encoding via ffmpeg
-        combined_audio.export(output_path, format="mp3")
-        print(f"\nconcatenation complete: output_path={output_path}")
-    except Exception as e:
-        print(f"error exporting combined mp3: exception={e}")
+# TODO  B) load player in webview
+def load_in_webview(target_url):
+    print("start load_in_webview")
 
 
-class WebViewDelegate(NSObject, metaclass=ObjCDelegate):
-    # Store intercepted URLs and the HTML result
-    intercepted_urls = []
-    html_content = None
-
-    # --- URL Interception ---
-    @objc_method
-    def webView_decidePolicyForNavigationAction_decisionHandler_(
-            self,
-            webView,
-            navigationAction,
-            decisionHandler
-    ):
-        # Get the URL of the request
-        request = navigationAction.request
-        url = request.URL.absoluteString
-
-        # Store the URL
-        print(f"Intercepted URL: {url}")
-        self.intercepted_urls.append(str(url))
-
-        # Allow the request to proceed (WKNavigationActionPolicyAllow = 1)
-        # decisionHandler(1)
-        # decisionHandler is a Block. We need to call it with the appropriate value.
-        # Note: In pure Objective-C, WKNavigationActionPolicyAllow is an enum value.
-        # You may need to verify the correct integer value for 'Allow' (which is 1)
-        decisionHandler(1)
-
-        # --- HTML Extraction ---
-
-    @objc_method
-    def webView_didFinishNavigation_(self, webView, navigation):
-        print("Page finished loading. Extracting HTML...")
-
-        # JavaScript code to get the entire page's HTML
-        js_get_html = "document.documentElement.outerHTML"
-
-        # Evaluate JavaScript in the web view
-        # The result comes back via a completion handler block
-        def completion_handler(html_string, error):
-            if error:
-                print(f"Error extracting HTML: {error}")
-            elif html_string:
-                # Store the extracted HTML as a Python string
-                self.html_content = str(html_string)
-                print(f"HTML extracted (Length: {len(self.html_content)})")
-
-            # This is where you would typically signal that the process is complete
-            # to prevent the Python script from exiting prematurely.
-            # E.g., setting a condition variable or stopping a run loop.
-            # For simplicity here, we rely on the final output.
-
-        # The evaluateJavaScript_completionHandler_ method expects a Block for the handler
-        Block(completion_handler)(js_get_html)
+# TODO  C) asynchronously request json
+async def request_json(url_string, callback):
+    print("start request_json")
 
 
-# request json from url
-def request_json(url_string, callback):
-    # create nsstring object of url
-    url = NSURL.URLWithString(url_string)
-
-    # 2. Get the shared NSURLSession
-    session = NSURLSession.sharedSession
-
-    # 3. Define the completion handler block
-    # The block takes (NSData, NSURLResponse, NSError)
-    @Block
-    def completion_handler(data, response, error):
-        json_string = None
-        error_string = None
-
-        if error:
-            # An error occurred (e.g., network failure)
-            error_string = str(error.description)
-        elif data:
-            # Data was received, convert it to a Python string
-            # Use NSUTF8StringEncoding (4)
-            data_string = NSString.alloc().initWithData(data, encoding=4)
-            if data_string:
-                json_string = str(data_string)
-            else:
-                error_string = "Could not decode data as UTF-8 string."
-        else:
-            # This case might happen with a valid response but no data (e.g., 204 No Content)
-            error_string = "No data received."
-
-        # Call the Python callback function with the result
-        callback(json_string, error_string)
-
-    # 4. Create and start the data task
-    task = session.dataTaskWithURL(url, completionHandler=completion_handler)
-
-    # All tasks start in a suspended state, you must call resume()
-    task.resume()
-
-
+# TODO  D) handle json response
 def handle_json_response(json_string, error_string):
-    """
-    The function to be called when the network request completes.
-    This will typically run on a background thread from the NSURLSession.
-    """
-    if error_string:
-        print(f"Error fetching data: {error_string}")
-        return
-
-    print("--- JSON Response (as String) ---")
-    print(json_string)
-
-    # You can now parse the string into a Python object if needed
-    try:
-        data_dict = json.loads(json_string)
-        print("\n--- Parsed JSON Key Example ---")
-        # Assuming the response is a dictionary and has a 'title' key for example
-        # print(f"Title: {data_dict.get('title', 'N/A')}")
-        print(f"Type of parsed data: {type(data_dict)}")
-    except json.JSONDecodeError as e:
-        print(f"\nError parsing JSON string: {e}")
+    print("start handle_json_response")
 
 
-def load_url_in_webview(target_url):
-    # 1. Create the configuration
-    config = WKWebViewConfiguration.alloc().init()
+# TODO  2) asynchronously download audio
+async def download_audio(audio_url, out, filename):
+    print("start download_audio")
 
-    # 2. Create the web view
-    frame = (0, 0, 500, 500)  # Simple arbitrary frame (x, y, width, height)
-    webview = WKWebView.alloc().initWithFrame_configuration_(frame, config)
 
-    # 3. Create and set the delegate
-    delegate = WebViewDelegate.alloc().init()
-    # WKWebView is an ObjCInstance, so its property setters are available
-    webview.navigationDelegate = delegate
-
-    # 4. Load the URL
-    url_obj = NSURL.URLWithString(target_url)
-    request_obj = NSURLRequest.requestWithURL(url_obj)
-    webview.loadRequest(request_obj)
-
-    # 5. Keep the webview and delegate alive while waiting for content
-    # In a full iOS app context (like BeeWare), the main app loop handles this.
-    # In a standalone script, you'd need a mechanism to keep the thread alive
-    # until the HTML is extracted (e.g., a run loop or a sleep loop).
-
-    # Example for demonstration (you'd need a robust loop in a real app):
-    import time
-    print("Loading web page...")
-    start_time = time.time()
-    while delegate.html_content is None and (time.time() - start_time) < 15:
-        time.sleep(0.5)
-        # Note: In a real rubicon-objc application, you would need to ensure
-        # that the main thread's run loop is active for delegate calls to work.
-
-    # 6. Return the results
-    return {
-        'urls': delegate.intercepted_urls,
-        'html': delegate.html_content
-    }
+# TODO concat chunks
+def concat_chunk_files(chunk_dir_path, dest_filepath):
+    print("start concat_chunk_files")
 
 
 class SoundLoader(toga.App):
@@ -318,9 +143,6 @@ class SoundLoader(toga.App):
         toga.Font.register("FiraSans", "resources/FiraSans-Regular.ttf")
         toga.Font.register("FiraSansExtraLight", "resources/FiraSans-ExtraLight.ttf")
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
-
-        # set path to ffmpeg
-        os.environ["FFMPEG_PATH"] = get_bundled_ffmpeg_path()
 
         # update ui
         self.show_init_layout()
@@ -610,37 +432,11 @@ class SoundLoader(toga.App):
             f"file_path_dest={file_path_dest}")
 
         # TODO concat chunk files
-        # av_concat(file_path_video, file_path_audio, file_path_output)
 
         await self.show_finished_layout()
         print("finished showing finished layout!")
 
-    # get html as string from webpage at URL
-    def get_html_from_url(url_string):
-        # 1. Create an NSURL object from the Python string
-        url = NSURL.URLWithString(url_string)
 
-        if url is None:
-            return f"Error: Could not create NSURL from '{url_string}'"
-
-        # 2. Create an NSError object placeholder (required by the method signature)
-        error = NSError.alloc().initWithDomain("", code=0, userInfo=None)
-
-        # 3. Use NSString's class method to get the content
-        # We use NSUTF8StringEncoding for the encoding, which is a common value.
-        html_content_objc = NSString.stringWithContentsOfURL(
-            url,
-            encoding=NSStringEncoding.NSUTF8StringEncoding,
-            error=error.ptr  # Pass a pointer to the error object
-        )
-
-        if html_content_objc is not None:
-            # The Objective-C NSString is automatically bridged to a Python str
-            return str(html_content_objc)
-        else:
-            # If loading fails, the error object might contain details
-            error_details = str(error.description) if error.description else "Unknown error"
-            return f"Error loading content: {error_details}"
 
     def load_url_in_webview(target_url):
         # create configuration
