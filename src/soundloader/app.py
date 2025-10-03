@@ -508,17 +508,14 @@ class SoundLoader(toga.App):
             return ""
 
         except requests.exceptions.RequestException as e:
-            # Handle network errors, timeouts, bad status codes, etc.
-            self.label.text = f"Error fetching JS: {e}"
             print(f"Error: {e}")
             # TODO show error message
             return ""
 
         except Exception as e:
-            # Handle other potential exceptions
-            self.label.text = f"An unexpected error occurred: {e}"
             # TODO show error message
             print(f"Unexpected Error: {e}")
+            return ""
 
     # (1G) request json w/ response handler
     async def get_json_as_string(self, url: str) -> str:
@@ -552,8 +549,20 @@ class SoundLoader(toga.App):
         """
         Background task to await the fetch and update the UI.
         """
+        global playlist_url
         json_str = await self.fetch_json_as_string(url)
         print(f"received json response: json_str={json_str}")
+
+        # get playlist_url
+        if "https://" in json_str:
+            start = json_str.find("https://")
+            end = json_str.find('"', start)
+            playlist_url = json_str[start:end]
+
+        print("finished requesting json")
+
+        # update ui
+        self.show_preview_layout(track_filename, thumbnail_url)
 
     # on load click
     async def start_load_audio(self, widget):
@@ -636,11 +645,8 @@ class SoundLoader(toga.App):
             print(f"full_stream_url={full_stream_url}")
 
             # request json
-            await self.add_background_task(lambda task: self._process_fetch(full_stream_url))
-            print("finished requesting json")
+            self.add_background_task(lambda task: await self._process_fetch(full_stream_url))
 
-            # update ui
-            self.show_preview_layout(track_filename, thumbnail_url)
 
     # on download click
     async def start_download_audio(self, widget):
