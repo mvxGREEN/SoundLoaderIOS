@@ -550,7 +550,7 @@ class SoundLoader(toga.App):
         Background task to await the fetch and update the UI.
         """
         global playlist_url
-        json_str = await self.fetch_json_as_string(url)
+        json_str = await self.get_json_as_string(url)
         print(f"received json response: json_str={json_str}")
 
         # get playlist_url
