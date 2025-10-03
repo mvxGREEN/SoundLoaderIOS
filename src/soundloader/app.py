@@ -435,6 +435,9 @@ class SoundLoader(toga.App):
 
         # get global var
         global player_url
+        global stream_url
+        global thumbnail_url
+        global track_filename
 
         # get html via js
         html = ""
@@ -451,9 +454,6 @@ class SoundLoader(toga.App):
                 #filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
 
                 # separate res into stream_url, track_filename, and thumbnail_url
-                global stream_url
-                global thumbnail_url
-                global track_filename
                 index_div1 = res.index("|||")
                 index_div2 = res.rindex("|||")
                 stream_url = res[:index_div1]
@@ -484,7 +484,6 @@ class SoundLoader(toga.App):
                 global client_id
                 client_id = await self.get_client_id_from("https://a-v2.sndcdn.com/assets/0-2e3ca6a5.js")
 
-                global stream_url
                 global full_stream_url
                 full_stream_url = stream_url + "?" + client_id + "&app_version=1759307428&app_locale=en"
                 print(f"full_stream_url={full_stream_url}")
