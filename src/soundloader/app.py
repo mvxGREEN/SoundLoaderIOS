@@ -23,12 +23,11 @@ from toga.validators import MinLength, StartsWith, Contains
 # global constants
 TWITTER_PLAYER = "twitter:player"
 TWITTER_TITLE = "twitter:title"
-BASE_URL_THUMBNAIL_1 = "i1.sndcdn.com/art"
-BASE_URL_THUMBNAIL = "i1.sndcdn.com/a"
-FLAG_BEGIN_STREAM_ID = "media/soundcloud:tracks:"
-FLAG_END_STREAM_ID = "/stream"
-BASE_URL_STREAM = "https://api-v2.soundcloud.com/media/soundcloud:tracks:"
+STREAM_URL_BEGIN = "https://api-v2.soundcloud.com/media/soundcloud:tracks:"
 STREAM_URL_END = "/stream/hls"
+BASE_URL_THUMBNAIL = "i1.sndcdn.com/a"
+STREAM_ID_BEGIN = "media/soundcloud:tracks:"
+STREAM_ID_END = "/stream"
 FLAG_CLIENT_ID = "client_id:u?"
 
 # global variables
@@ -44,14 +43,14 @@ track_title = ""
 track_artist = ""
 
 
-# TODO uncommnt
+# TODO uncomment
 # from rubicon.objc import ObjCClass
 
 # expose objc TODO uncomment
 # UIPasteboard = ObjCClass('UIPasteboard')
 
 
-# get absolute path to destination directory
+# get path to destination directory
 def get_dest_path():
     # check OS
     if sys.platform == 'ios':
@@ -71,13 +70,13 @@ def get_dest_path():
         return "¯\\_(ツ)_/¯"
 
 
-# TODO get absolute path to temp directory
+# get path to temp directory
 def get_temp_path():
     # append 'soundloader_temp' to destination directory
     return get_dest_path() + 'temp'
 
 
-# create temp directory for playlist and chunk files
+# create temp directory for temp files
 def create_temp_dir():
     docs_path = get_dest_path()
     try:
@@ -606,7 +605,7 @@ class SoundLoader(toga.App):
             if "tracks" in player_url:
                 startIndex = player_url.rfind("tracks") + 10
                 endIndex = player_url.find('&', startIndex)
-                stream_url = BASE_URL_STREAM + player_url[startIndex:endIndex] + STREAM_URL_END
+                stream_url = STREAM_URL_BEGIN + player_url[startIndex:endIndex] + STREAM_URL_END
                 print(f"found stream_url={stream_url}")
             else:
                 # TODO show error message if missing stream_url
@@ -643,7 +642,7 @@ class SoundLoader(toga.App):
 
             # build full_stream_url
             global full_stream_url
-            full_stream_url = stream_url + "?client_id=" + client_id + "&app_version=1759307428&app_locale=en"
+            full_stream_url = stream_url + "?client_id=" + client_id # + "&app_version=1759307428&app_locale=en"
             print(f"full_stream_url={full_stream_url}")
 
             # request json
