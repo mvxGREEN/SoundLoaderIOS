@@ -501,8 +501,8 @@ class SoundLoader(toga.App):
             # extract client_id
             if 'client_id=' in js_content:
                 start = js_content.find('client_id=') + 10
-                c_id = js_content[start]
-                c_id = c_id[c_id.find('"')]
+                end = js_content.find('"', start)
+                c_id = js_content[start:end]
                 print(f"found client_id! c_id={c_id}")
                 return c_id
             return ""
@@ -639,9 +639,11 @@ class SoundLoader(toga.App):
             # get client_id
             global client_id
             client_id = await self.get_client_id_from("https://a-v2.sndcdn.com/assets/0-2e3ca6a5.js")
+            print(f"client_id={client_id}")
 
+            # build full_stream_url
             global full_stream_url
-            full_stream_url = stream_url + "?" + client_id + "&app_version=1759307428&app_locale=en"
+            full_stream_url = stream_url + "?client_id=" + client_id + "&app_version=1759307428&app_locale=en"
             print(f"full_stream_url={full_stream_url}")
 
             # request json
