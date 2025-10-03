@@ -602,11 +602,12 @@ class SoundLoader(toga.App):
             player_url = self.extract_player_url(html)
             print(f"found player_url={player_url}")
 
-            if "tracks" in player_url:
-                startIndex = player_url.rfind("tracks") + 11
-                endIndex = player_url.find('&', startIndex)
-                stream_url = STREAM_URL_BEGIN + player_url[startIndex:endIndex] + STREAM_URL_END
-                print(f"found stream_url={stream_url}")
+            # extract last stream url
+            if STREAM_ID_BEGIN in html and STREAM_ID_END in html:
+                start = html.rfind(STREAM_ID_BEGIN) + len(STREAM_ID_BEGIN)
+                end = html.rfind(STREAM_ID_END)
+                stream_url = STREAM_URL_BEGIN + html[start:end] + STREAM_URL_END
+                print(f"stream_url={stream_url}")
             else:
                 # TODO show error message if missing stream_url
                 print(f"missing stream id in: player_url={player_url}")
