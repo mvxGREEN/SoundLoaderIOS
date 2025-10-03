@@ -22,8 +22,9 @@ from toga.validators import MinLength, StartsWith, Contains
 
 # global constants
 TWITTER_PLAYER = "twitter:player"
+TWITTER_TITLE = "twitter:title"
 BASE_URL_THUMBNAIL_1 = "i1.sndcdn.com/art"
-BASE_URL_THUMBNAIL_2 = "i1.sndcdn.com/a"
+BASE_URL_THUMBNAIL = "i1.sndcdn.com/a"
 FLAG_BEGIN_STREAM_ID = "media/soundcloud:tracks:"
 FLAG_END_STREAM_ID = "/stream"
 BASE_URL_STREAM = "https://api-v2.soundcloud.com/media/soundcloud:tracks:"
@@ -44,10 +45,10 @@ track_artist = ""
 
 
 # TODO uncommnt
-#from rubicon.objc import ObjCClass
+# from rubicon.objc import ObjCClass
 
 # expose objc TODO uncomment
-#UIPasteboard = ObjCClass('UIPasteboard')
+# UIPasteboard = ObjCClass('UIPasteboard')
 
 
 # get absolute path to destination directory
@@ -346,20 +347,19 @@ class SoundLoader(toga.App):
             # set load_button to clear
             self.load_button.text = "Clear"
 
-
     # paste copied text into url_input TODO uncomment
     def paste_action(self):
         print("paste_action")
         # Get the general pasteboard instance
-        #pasteboard = UIPasteboard.generalPasteboard
+        # pasteboard = UIPasteboard.generalPasteboard
 
         # Get the string content from the pasteboard
-        #pasted_text = pasteboard.string
+        # pasted_text = pasteboard.string
 
         # Check if there is any text to paste
-        #if pasted_text:
-            # Set the value of the TextInput to the pasted text
-            #self.url_input.value = pasted_text
+        # if pasted_text:
+        # Set the value of the TextInput to the pasted text
+        # self.url_input.value = pasted_text
 
     # clear text from url_input
     def clear_action(self):
@@ -451,24 +451,22 @@ class SoundLoader(toga.App):
                 res = self.extract_info(html)
 
                 # random id for filename to prevent overwrite
-                #filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
+                # filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
 
                 # separate res into stream_url, track_filename, and thumbnail_url
-                index_div1 = res.index("|||")
-                index_div2 = res.rindex("|||")
-                stream_url = res[:index_div1]
-                track_filename = res[index_div1+3:index_div2]
-                thumbnail_url = res[index_div2+3:]
+                index_div = res.index("|||")
+                track_filename = res[:index_div]
+                thumbnail_url = res[index_div + 3:]
                 print(f"extract_info res:\nstream_url={stream_url}"
-                    f"\ntrack_filename={track_filename}"
-                    f"\nthumbnail_url={thumbnail_url}")
+                      f"\ntrack_filename={track_filename}"
+                      f"\nthumbnail_url={thumbnail_url}")
 
                 # separate track_filename into track_title and track_artist
                 global track_title
                 global track_artist
                 index_div3 = track_filename.index("__")
                 track_title = track_filename[:index_div3]
-                track_artist = track_artist[index_div3+3:]
+                track_artist = track_artist[index_div3 + 3:]
                 print(f"extract_info res:\ntrack_title={track_title}"
                       f"\ntrack_artist={track_artist}")
 
@@ -497,23 +495,31 @@ class SoundLoader(toga.App):
     # (1E) get audio info
     def extract_info(self, html) -> str:
         print(f"extract_info: len(html)={len(html)}")
+        div = "|||"
 
-        # TODO extract stream_url
-        if BASE_URL_STREAM in html:
-            print("found BASE_URL_STREAM in html")
+        # extract filename
+        filename = "soundloader_download"
+        if TWITTER_TITLE in html:
+            searchIndex = html.find(TWITTER_TITLE)
+            startIndex = html.find("content", searchIndex) + 9
+            endIndex = html.find('"', startIndex)
+            filename = html[startIndex:endIndex]
+            print(f"found TWITTER_TITLE in html: filename={filename}")
         else:
-            print("missing BASE_STREAM_URL in html")
+            print(f"missing TWITTER_TITLE in html: filename={filename}")
 
-        # TODO extract filename, title, artist, etc.
-        filename = "stream_url|||title__artist|||thumbnail_url"
-
-        # TODO extract thumbnail url
-        if BASE_URL_THUMBNAIL_1 in html | BASE_URL_THUMBNAIL_2 in html:
-            print("found BASE_URL_THUMBNAIL in html")
+        # extract thumbnail url
+        t_url = ""
+        if BASE_URL_THUMBNAIL in html:
+            startIndex = html.find(BASE_URL_THUMBNAIL)
+            endIndex = html.find('"', startIndex)
+            t_url = "https://" + html[startIndex:endIndex]
+            print(f"found BASE_URL_THUMBNAIL in html: t_url={t_url}")
         else:
-            print("missing BASE_URL_THUMBNAIL in html")
+            print(f"missing BASE_URL_THUMBNAIL in html: t_url={t_url}")
 
-        return ""
+        # concat info with dividers
+        return filename + div + t_url
 
     # (1F) get client_id
     async def get_client_id_from(self, js_url) -> str:
@@ -532,7 +538,7 @@ class SoundLoader(toga.App):
 
             # extract client_id
             if 'client_id=' in js_content:
-                start = js_content.find('client_id=')+10
+                start = js_content.find('client_id=') + 10
                 c_id = js_content[start]
                 c_id = c_id[c_id.find('"')]
                 print(f"found client_id! c_id={c_id}")
@@ -590,6 +596,8 @@ class SoundLoader(toga.App):
     # on load click
     async def start_load_audio(self, widget):
         print("load button clicked (start_load_audio)")
+        global player_url
+        global stream_url
 
         # hide keyboard
         self.app.main_window.content = self.app.main_window.content
@@ -603,7 +611,7 @@ class SoundLoader(toga.App):
         if not self.url_input.value:
             self.paste_action()
 
-        # validate input TODO show error message on invalid input
+        # validate input
         if "https://" in self.url_input.value and self.url_input.value.count("/") >= 3:
             # show loading ui
             self.show_loading_layout()
@@ -621,6 +629,15 @@ class SoundLoader(toga.App):
             # extract player url
             player_url = self.extract_player_url(html)
             print(f"found player_url={player_url}")
+
+            if "tracks" in player_url:
+                startIndex = player_url.rfind("tracks") + 10
+                endIndex = player_url.find('&', startIndex)
+                stream_url = BASE_URL_STREAM + player_url[startIndex:endIndex] + STREAM_URL_END
+                print(f"found stream_url={stream_url}")
+            else:
+                # TODO show error message if missing stream_url
+                print(f"missing stream id in: player_url={player_url}")
 
             # load player in webiew
             self.load_in_webview(player_url)
