@@ -603,7 +603,7 @@ class SoundLoader(toga.App):
             print(f"found player_url={player_url}")
 
             if "tracks" in player_url:
-                startIndex = player_url.rfind("tracks") + 10
+                startIndex = player_url.rfind("tracks") + 11
                 endIndex = player_url.find('&', startIndex)
                 stream_url = STREAM_URL_BEGIN + player_url[startIndex:endIndex] + STREAM_URL_END
                 print(f"found stream_url={stream_url}")
