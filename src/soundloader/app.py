@@ -550,15 +550,16 @@ class SoundLoader(toga.App):
         """
         global playlist_url
         json_str = await self.get_json_as_string(url)
-        print(f"received json response: json_str={json_str}")
+        print("finished request json")
 
-        # get playlist_url
+        # get playlist_url from json
         if "https://" in json_str:
             start = json_str.find("https://")
             end = json_str.find('"', start)
             playlist_url = json_str[start:end]
-
-        print("finished requesting json")
+            print(f"found playlist_url={playlist_url}")
+        else:
+            print(f"missing playlist_url in json_str={json_str}")
 
         # update ui
         self.show_preview_layout(track_filename, thumbnail_url)
