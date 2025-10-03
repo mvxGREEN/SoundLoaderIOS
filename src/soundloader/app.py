@@ -22,11 +22,11 @@ from toga.validators import MinLength, StartsWith, Contains
 
 # global constants
 TWITTER_PLAYER = "twitter:player"
-BASE_THUMBNAIL_URL = "i1.sndcdn.com/art"
-BASE_THUMBNAIL_URL_ALT = "i1.sndcdn.com/a"
+BASE_URL_THUMBNAIL_1 = "i1.sndcdn.com/art"
+BASE_URL_THUMBNAIL_2 = "i1.sndcdn.com/a"
 FLAG_BEGIN_STREAM_ID = "media/soundcloud:tracks:"
 FLAG_END_STREAM_ID = "/stream"
-STREAM_URL_BASE = "https://api-v2.soundcloud.com/media/soundcloud:tracks:"
+BASE_URL_STREAM = "https://api-v2.soundcloud.com/media/soundcloud:tracks:"
 STREAM_URL_END = "/stream/hls"
 FLAG_CLIENT_ID = "client_id:u?"
 
@@ -495,15 +495,24 @@ class SoundLoader(toga.App):
                 # TODO show error message
                 return
 
-    # (1E) TODO get audio info
+    # (1E) get audio info
     def extract_info(self, html) -> str:
         print(f"extract_info: len(html)={len(html)}")
 
-        # extract stream_url
+        # TODO extract stream_url
+        if BASE_URL_STREAM in html:
+            print("found BASE_URL_STREAM in html")
+        else:
+            print("missing BASE_STREAM_URL in html")
 
-        # extract filename, title, artist, etc.
+        # TODO extract filename, title, artist, etc.
+        filename = "stream_url|||title__artist|||thumbnail_url"
 
-        # extract thumbnail url
+        # TODO extract thumbnail url
+        if BASE_URL_THUMBNAIL_1 in html | BASE_URL_THUMBNAIL_2 in html:
+            print("found BASE_URL_THUMBNAIL in html")
+        else:
+            print("missing BASE_URL_THUMBNAIL in html")
 
         return ""
 
