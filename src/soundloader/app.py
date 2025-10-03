@@ -448,46 +448,8 @@ class SoundLoader(toga.App):
             print(f"An error occurred while running JavaScript: {e}")
         finally:
             if len(html) < 300:
-                res = self.extract_info(html)
+                print(f"received html from JS: len(html)={len(html)}")
 
-                # random id for filename to prevent overwrite
-                # filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
-
-                # separate res into stream_url, track_filename, and thumbnail_url
-                index_div = res.index("|||")
-                track_filename = res[:index_div]
-                thumbnail_url = res[index_div + 3:]
-                print(f"extract_info res:\nstream_url={stream_url}"
-                      f"\ntrack_filename={track_filename}"
-                      f"\nthumbnail_url={thumbnail_url}")
-
-                # separate track_filename into track_title and track_artist
-                global track_title
-                global track_artist
-                index_div3 = track_filename.index("__")
-                track_title = track_filename[:index_div3]
-                track_artist = track_artist[index_div3 + 3:]
-                print(f"extract_info res:\ntrack_title={track_title}"
-                      f"\ntrack_artist={track_artist}")
-
-                # sanitize filename
-                track_filename = sanitize_filename(track_filename)
-
-                # convert webp thumbnail to jpg
-                if thumbnail_url.endswith(".webp"):
-                    thumbnail_url = thumbnail_url.replace("vi_webp", "vi")
-                    thumbnail_url = thumbnail_url.replace(".webp", ".jpg")
-
-                # get client_id
-                global client_id
-                client_id = await self.get_client_id_from("https://a-v2.sndcdn.com/assets/0-2e3ca6a5.js")
-
-                global full_stream_url
-                full_stream_url = stream_url + "?" + client_id + "&app_version=1759307428&app_locale=en"
-                print(f"full_stream_url={full_stream_url}")
-
-                # request json
-                self.add_background_task(lambda task: self._process_fetch(full_stream_url))
             else:
                 # TODO show error message
                 return
@@ -598,6 +560,8 @@ class SoundLoader(toga.App):
         print("load button clicked (start_load_audio)")
         global player_url
         global stream_url
+        global track_filename
+        global thumbnail_url
 
         # hide keyboard
         self.app.main_window.content = self.app.main_window.content
@@ -640,7 +604,39 @@ class SoundLoader(toga.App):
                 print(f"missing stream id in: player_url={player_url}")
 
             # load player in webiew
-            self.load_in_webview(player_url)
+            #self.load_in_webview(player_url)
+
+            # extract thumbnail_url, filename and metadata
+            res = self.extract_info(html)
+
+            # random id for filename to prevent overwrite
+            # filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
+
+            # separate res into track_filename, thumbnail_url
+            index_div = res.index("|||")
+            track_filename = res[:index_div]
+            thumbnail_url = res[index_div + 3:]
+            print(f"audio info:\ntrack_filename={track_filename}"
+                  f"\nthumbnail_url={thumbnail_url}")
+
+            # sanitize filename
+            track_filename = sanitize_filename(track_filename)
+
+            # convert webp thumbnail to jpg
+            if thumbnail_url.endswith(".webp"):
+                thumbnail_url = thumbnail_url.replace("vi_webp", "vi")
+                thumbnail_url = thumbnail_url.replace(".webp", ".jpg")
+
+            # get client_id
+            global client_id
+            client_id = await self.get_client_id_from("https://a-v2.sndcdn.com/assets/0-2e3ca6a5.js")
+
+            global full_stream_url
+            full_stream_url = stream_url + "?" + client_id + "&app_version=1759307428&app_locale=en"
+            print(f"full_stream_url={full_stream_url}")
+
+            # request json
+            self.add_background_task(lambda task: self._process_fetch(full_stream_url))
 
     # on download click
     async def start_download_audio(self, widget):
