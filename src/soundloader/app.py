@@ -645,7 +645,8 @@ class SoundLoader(toga.App):
             print(f"full_stream_url={full_stream_url}")
 
             # request json
-            self.add_background_task(lambda task: await self._process_fetch(full_stream_url))
+            await self._process_fetch(full_stream_url)
+            print("_process_fetch finished!")
 
 
     # on download click
