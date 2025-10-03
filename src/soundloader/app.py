@@ -6,6 +6,7 @@ import toga
 import asyncio
 import aiohttp
 from aiohttp import ClientConnectorError
+import httpx
 import queue
 import re
 import random
@@ -388,6 +389,7 @@ class SoundLoader(toga.App):
 
                     # Read the response content as text (HTML in this case).
                     html = await response.text()
+                    print(f"received html response from: url={url}")
                     return html
 
         except ClientConnectorError as e:
@@ -402,6 +404,21 @@ class SoundLoader(toga.App):
             # Handle any other unexpected exceptions
             print(f"An unexpected error occurred for {url}: {e}")
             return ""
+
+    # (1B) parse html for player_url
+    def extract_player_url(self, html) -> str:
+        print(f"extract_player_url: len(html)={len(html)}")
+
+        if TWITTER_PLAYER in html:
+            print("found TWITTER_PLAYER in html")
+
+            # extract player_url
+            searchIndex = html.find(TWITTER_PLAYER) + len(TWITTER_PLAYER)
+            startIndex = html.find("content", searchIndex) + 9
+            endIndex = html.find('"', startIndex)
+            return html[startIndex:endIndex]
+        print(f"missing TWITTER_PLAYER in html:\nhtml={html}")
+        return ""
 
     # (1C) load player_url in webview
     def load_in_webview(self, player_url):
@@ -472,13 +489,25 @@ class SoundLoader(toga.App):
                 full_stream_url = stream_url + "?" + client_id + "&app_version=1759307428&app_locale=en"
                 print(f"full_stream_url={full_stream_url}")
 
-                # request json with handler
-                await self.request_json(full_stream_url, self.handle_json_response)
+                # request json
+                self.add_background_task(lambda task: self._process_fetch(full_stream_url))
             else:
                 # TODO show error message
                 return
 
-    # (1E) get client_id
+    # (1E) TODO get audio info
+    def extract_info(self, html) -> str:
+        print(f"extract_info: len(html)={len(html)}")
+
+        # extract stream_url
+
+        # extract filename, title, artist, etc.
+
+        # extract thumbnail url
+
+        return ""
+
+    # (1F) get client_id
     async def get_client_id_from(self, js_url) -> str:
         try:
             # execute js request
@@ -515,25 +544,40 @@ class SoundLoader(toga.App):
             # TODO show error message
             print(f"Unexpected Error: {e}")
 
-    # (1B) TODO parse html for player_url and extract html
-    def extract_player_url(self, html) -> str:
-        print(f"extract_player_url: len(html)={len(html)}")
+    # (1G) request json w/ response handler
+    async def get_json_as_string(self, url: str) -> str:
+        """
+        Asynchronously fetches JSON data from a URL and returns it as a string.
+        """
+        print(f"start get_json_as_string: url={url}")
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url)
 
-        return ""
+                # raise an exception for bad status codes (4xx or 5xx)
+                response.raise_for_status()
 
-    # (1H) request json w/ response handler
-    async def request_json(self, full_stream_url, callback):
-        print(f"start request_json: full_stream_url={full_stream_url}")
+                # get the response content as a string
+                json_string = response.text
 
-    # parse json response
-    def handle_json_response(self, json):
-        print(f"start handle_json_response: json={json}")
+                return json_string
 
-        # TODO extract playlist_url
-        global playlist_url
+        except httpx.HTTPStatusError as e:
+            # Handle HTTP errors (e.g., 404 Not Found, 500 Server Error)
+            return f"HTTP Error: {e.response.status_code} - {e.response.reason_phrase}"
+        except httpx.RequestError as e:
+            # Handle general request errors (e.g., connection timeout, DNS error)
+            return f"Request Error: An error occurred while requesting {e.request.url} - {e.__class__.__name__}"
+        except Exception as e:
+            # Handle other unexpected errors
+            return f"An unexpected error occurred: {e}"
 
-        # update ui
-        self.show_preview_layout(track_filename, thumbnail_url)
+    async def _process_fetch(self, url):
+        """
+        Background task to await the fetch and update the UI.
+        """
+        json_str = await self.fetch_json_as_string(url)
+        print(f"received json response: json_str={json_str}")
 
     # on load click
     async def start_load_audio(self, widget):
@@ -559,7 +603,7 @@ class SoundLoader(toga.App):
             # await player_url
             input_url = self.url_input.value
             html = await self.get_html_from(input_url)
-            print("finished get_html_from")
+            print(f"finished get_html_from: len(html)={len(html)}")
 
             # exit if html too small TODO show error message
             if len(html) < 300:
@@ -567,7 +611,8 @@ class SoundLoader(toga.App):
                 return
 
             # extract player url
-            player_url = extract_player_url(html)
+            player_url = self.extract_player_url(html)
+            print(f"found player_url={player_url}")
 
             # load player in webiew
             self.load_in_webview(player_url)
