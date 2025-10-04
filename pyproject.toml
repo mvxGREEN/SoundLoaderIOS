@@ -2,7 +2,7 @@
 [tool.briefcase]
 project_name = "SoundLoader"
 bundle = "com.mvxgreen"
-version = "0.0.1"
+version = "1.0.1"
 url = "https://mobileapps.green"
 license.file = "LICENSE"
 author = "Max Green"
@@ -10,9 +10,12 @@ author_email = "mvxgreen@mobileapps.green"
 
 [tool.briefcase.app.soundloader]
 formal_name = "SoundLoader"
-description = "A Cloud-to-MP3 Downloader for IOS"
-long_description = """More details about the app should go here.
+description = "The Cloud-to-MP3 Downloader for IOS"
+long_description = """The Cloud-to-MP3 Downloader for IOS
 """
+icon = "icons/savefrom"
+splash_background_color = "#000000"
+
 sources = [
     "src/soundloader",
 ]
