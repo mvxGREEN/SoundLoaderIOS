@@ -804,6 +804,9 @@ class SoundLoader(toga.App):
         # hide keyboard
         self.app.main_window.content = self.app.main_window.content
 
+        # create temp dir
+        self.create_temp_dir()
+
         # update ui
         await self.show_downloading_layout()
 
