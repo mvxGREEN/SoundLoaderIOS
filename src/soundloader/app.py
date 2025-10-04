@@ -233,7 +233,7 @@ class SoundLoader(toga.App):
 
     # create temp directory for temp files
     def create_temp_dir(self):
-        docs_path = str(self.get_temp_path_str())
+        docs_path = str(self.get_temp_path())
         try:
             os.mkdir(docs_path)
             print(f"Directory '{docs_path}' created successfully.")
