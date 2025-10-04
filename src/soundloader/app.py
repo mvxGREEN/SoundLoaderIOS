@@ -3,6 +3,7 @@ A Cloud-to-MP3 Downloader for IOS
 """
 
 import toga
+from toga.paths import paths
 import asyncio
 import aiohttp
 from aiohttp import ClientConnectorError
@@ -88,31 +89,6 @@ def create_temp_dir():
         print(f"Parent directory for '{docs_path}' does not exist.")
 
 
-# TODO (2) asynchronously download audio
-async def download_audio(audio_url, dest_path, filename):
-    print(f"start download_audio: audio_url={audio_url}, filename={dest_path}, filename={filename}")
-
-
-# TODO (2A) asynchronously download m3u
-async def download_m3u(playlist_url, dest_path):
-    print(f"start download_m3u: playlist_url={playlist_url}")
-
-
-# TODO (2B) parse m3u for chunk_urls
-def extract_chunk_urls(m3u_filepath):
-    print(f"extract_chunk_urls: m3u_filepath={m3u_filepath}")
-
-
-# TODO (2C) asynchronously download chunks
-async def download_chunks(chunk_urls, dest_path):
-    print(f"start download_chunks: len(chunk_urls)={len(chunk_urls)}")
-
-
-# TODO (2D) concat chunks into mp3 w/ thumbnail and metadata
-def concat_chunk_files(chunk_dir_path, dest_filepath):
-    print("start concat_chunk_files")
-
-
 # remove prohibited characters from filename
 def sanitize_filename(filename):
     """Removes or replaces sensitive characters from a filename.
@@ -138,6 +114,107 @@ def sanitize_filename(filename):
     filename = filename.encode('ascii', 'ignore').decode('ascii')
 
     return filename
+
+
+# (2A) download playlist
+async def download_m3u_file(url, filename) -> str:
+    """
+    Asynchronously downloads a file from a URL and saves it to the app's data folder.
+    """
+    try:
+        # Use app.paths.data to get a suitable, writable path for the app
+        # This will be a sandboxed directory on iOS.
+        download_dir = paths.data
+        save_path = os.path.join(download_dir, filename)
+
+        # 1. Perform the network request asynchronously using asyncio.to_thread
+        # This prevents the requests call from blocking the main Toga GUI thread.
+        response = await asyncio.to_thread(requests.get, url, stream=True)
+        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+
+        # 2. Save the file content in chunks
+        with open(save_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f"✅ Download complete. File saved to: {save_path}")
+
+        return save_path
+
+    except requests.exceptions.RequestException as e:
+        error_message = f"Download failed: {e}"
+        print(f"❌ {error_message}")
+        return ""
+    except Exception as e:
+        error_message = f"An unexpected error occurred: {e}"
+        print(f"❌ {error_message}")
+        return ""
+
+
+# (2B) parse m3u for chunk_urls
+def parse_m3u_file(file_path) -> []:
+    """
+    Parses an M3U file at the given path and returns a list of all URLs.
+
+    :param file_path: The full path to the M3U file in the iOS sandbox.
+    :return: A list of strings, where each string is a media URL.
+    """
+    if not os.path.exists(file_path):
+        print(f"Error: File not found at path: {file_path}")
+        return []
+
+    urls = []
+    try:
+        # 'r' mode opens the file for reading in text mode.
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                # Remove leading/trailing whitespace and newline characters
+                clean_line = line.strip()
+
+                # Ignore comments/metadata lines (which start with '#')
+                if clean_line and not clean_line.startswith('#'):
+                    urls.append(clean_line)
+
+    except Exception as e:
+        # Handle potential file access or encoding errors
+        print(f"Error reading or parsing M3U file: {e}")
+        return []
+
+    return urls
+
+
+# (2C) download chunk
+async def download_chunk(url: str, save_path: Path) -> tuple[str, str]:
+    """
+    Asynchronously downloads a file from a URL and saves it to a path.
+    Returns the URL and the path of the saved file.
+    """
+    try:
+        # Use httpx.AsyncClient for asynchronous requests
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Use stream=True for large files
+            async with client.stream("GET", url) as response:
+                response.raise_for_status()  # Raise exception for bad status codes
+
+                # Extract filename from the URL or Content-Disposition header
+                # For simplicity, we use the last part of the URL path
+                filename = url.split('/')[-1]
+                if not filename:
+                    filename = "downloaded_file"
+
+                final_path = save_path / filename
+
+                # Write content to a local file in chunks
+                with open(final_path, "wb") as file:
+                    async for chunk in response.aiter_bytes():
+                        file.write(chunk)
+
+                return filename, str(final_path)
+
+    except httpx.RequestError as e:
+        return f"ERROR: Failed to download {url.split('/')[-1]}. Request error: {e}", ""
+    except Exception as e:
+        return f"ERROR: Failed to download {url.split('/')[-1]}. Unexpected error: {e}", ""
 
 
 class SoundLoader(toga.App):
@@ -453,10 +530,9 @@ class SoundLoader(toga.App):
                 # TODO show error message
                 return
 
-    # (1E) get audio info
-    def extract_info(self, html) -> str:
+    # (1E) extract filename, thumbnail_url, metadata
+    def extract_info(self, html) -> tuple[str, str, str, str]:
         print(f"extract_info: len(html)={len(html)}")
-        div = "|||"
 
         # extract filename
         filename = "soundloader_download"
@@ -479,8 +555,30 @@ class SoundLoader(toga.App):
         else:
             print(f"missing BASE_URL_THUMBNAIL in html: t_url={t_url}")
 
-        # concat info with dividers
-        return filename + div + t_url
+        # get meta
+        meta = ""
+        if "<h1" in html and "<meta" in html:
+            start = html.find("<h1")
+            end = html.find("<meta", start)
+            meta = html[start:end]
+        else:
+            print("html missing meta!")
+
+        # get track title and artist
+        tt = filename  # default title
+        ta = ""
+        if "<a" in meta:
+            search = meta.find("<a")
+            start = meta.find(">", search)
+            end = meta.find("</a", start)
+            tt = meta[start:end]
+            print(f"found track title: tt={tt}")
+            search = meta.rfind("<a")
+            start = meta.find(">", search)
+            end = meta.find("</a", start)
+            ta = meta[start:end]
+            print(f"found track artist: ta={ta}")
+        return filename, t_url, tt, ta
 
     # (1F) get client_id
     async def get_client_id_from(self, js_url) -> str:
@@ -571,6 +669,8 @@ class SoundLoader(toga.App):
         global stream_url
         global track_filename
         global thumbnail_url
+        global track_title
+        global track_artist
 
         # hide keyboard
         self.app.main_window.content = self.app.main_window.content
@@ -614,20 +714,16 @@ class SoundLoader(toga.App):
                 print(f"missing stream id in: player_url={player_url}")
 
             # load player in webiew
-            #self.load_in_webview(player_url)
+            # self.load_in_webview(player_url)
 
             # extract thumbnail_url, filename and metadata
             res = self.extract_info(html)
-
-            # random id for filename to prevent overwrite
-            # filename_id = f"{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}{random.randint(0, 9)}_"
-
-            # separate res into track_filename, thumbnail_url
-            index_div = res.index("|||")
-            track_filename = res[:index_div]
-            thumbnail_url = res[index_div + 3:]
+            track_filename = res[0]
+            thumbnail_url = res[1]
+            track_title = res[2]
+            track_artist = res[3]
             print(f"audio info:\ntrack_filename={track_filename}"
-                  f"\nthumbnail_url={thumbnail_url}")
+                  f"\nthumbnail_url={thumbnail_url}\ntrack_title={track_title}\ntrack_artist={track_artist}")
 
             # sanitize filename
             track_filename = sanitize_filename(track_filename)
@@ -644,15 +740,14 @@ class SoundLoader(toga.App):
 
             # build full_stream_url
             global full_stream_url
-            full_stream_url = stream_url + "?client_id=" + client_id # + "&app_version=1759307428&app_locale=en"
+            full_stream_url = stream_url + "?client_id=" + client_id  # + "&app_version=1759307428&app_locale=en"
             print(f"full_stream_url={full_stream_url}")
 
             # request json
             await self._process_fetch(full_stream_url)
             print("_process_fetch finished!")
 
-
-    # on download click
+    # ------------------- DOWNLOAD -------------------
     async def start_download_audio(self, widget):
         print("download button clicked (start_download_audio)")
 
@@ -664,23 +759,42 @@ class SoundLoader(toga.App):
 
         # start downloading audio
         dl_a_task = asyncio.create_task(
-            download_audio(f"{self.url_input.value}",
-                           get_dest_path(),
-                           f"{self.filename_input.value}"))
+            self.download_audio(f"{self.url_input.value}",
+                                get_dest_path(),
+                                f"{self.filename_input.value}"))
         await dl_a_task
         print(f"finished download_audio task")
 
-        # get filepath of destination
+        # get path to saved file
         file_path_dest = get_dest_path() + f"{self.filename_input.value}" + ".mp3"
         print(f"file_path_dest={file_path_dest}")
-
-        # TODO get filepaths of chunks
-
-        # TODO concat chunks to destination
 
         # update ui
         await self.show_finished_layout()
         print("finished showing finished layout!")
+
+    # TODO (2) asynchronously download audio
+    async def download_audio(self, playlist_url, dest_path, filename):
+        print(f"start download_audio:\nplaylist_url={playlist_url}, dest_path={dest_path}, filename={filename}")
+
+        # download playlist
+        playlist_path = await download_m3u_file(playlist_url, filename)
+        print(f"finished playlist download: playlist_path={playlist_path}")
+
+        # parse playlist for chunk_urls
+        chunk_urls = parse_m3u_file(playlist_path)
+        print(f"finished parsing m3u: len(chunk_urls)={chunk_urls}")
+
+        # download all chunk files
+
+
+    # TODO (2C) asynchronously download chunks
+    async def download_chunks(chunk_urls, dest_path):
+        print(f"start download_chunks: len(chunk_urls)={len(chunk_urls)}")
+
+    # TODO (2D) concat chunks into mp3 w/ thumbnail and metadata
+    def concat_chunk_files(chunk_dir_path, dest_filepath):
+        print("start concat_chunk_files")
 
 
 async def main():
