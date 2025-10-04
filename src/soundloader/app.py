@@ -224,7 +224,7 @@ async def download_art(url: str, save_path: Path) -> str:
 
                 # set thumbnail filename
                 global thumbnail_filename
-                final_path = toga.Paths / thumbnail_filename
+                final_path = paths.data / thumbnail_filename
 
                 # write content to a local file in chunks
                 with open(final_path, "wb") as file:
@@ -828,7 +828,7 @@ class SoundLoader(toga.App):
 
         # make an array of download chunk tasks
         download_tasks = [
-            download_chunk(url, Path(get_temp_path()), chunk_index=i)
+            download_chunk(url, paths.data, chunk_index=i)
             for i, url in enumerate(chunk_urls)
         ]
 
@@ -837,8 +837,8 @@ class SoundLoader(toga.App):
         print(f"finished downloading chunks to: len(chunk_urls)={len(chunk_urls)}")
 
         # download thumbnail
-        await download_art(thumbnail_url, Path(get_temp_path()))
-        print(f"finished downloading thumbnail to: get_temp_path()={get_temp_path()}")
+        await download_art(thumbnail_url, paths.data)
+        print(f"finished downloading thumbnail to: str(paths.data)={str(paths.data)}")
 
         # concat chunks w/ thumbnail and tags
         complete_filepath = await self.concat_chunk_files(get_temp_path(), get_dest_path())
