@@ -8,7 +8,7 @@ import asyncio
 import aiohttp
 from aiohttp import ClientConnectorError
 import httpx
-import queue
+import shutil
 import re
 import random
 import sys
@@ -96,6 +96,27 @@ def sanitize_filename(filename):
     filename = filename.encode('ascii', 'ignore').decode('ascii')
 
     return filename
+
+
+# delete directory and all its files and subfolders
+def delete_directory_recursively(directory_path):
+    print(f"delete_recursively: directory_path={directory_path}")
+
+    # check if dir exists
+    if not os.path.exists(directory_path):
+        print(f"Error: Directory '{directory_path}' does not exist.")
+        return
+
+    try:
+        # The core function for recursive deletion
+        shutil.rmtree(directory_path)
+        print(f"Directory '{directory_path}' and all contents deleted successfully.")
+    except PermissionError:
+        print(f"Error: Permission denied. Cannot delete directory '{directory_path}'.")
+    except Exception as e:
+        # Catch any other unexpected I/O errors
+        print(f"An unexpected error occurred while deleting '{directory_path}': {e}")
+
 
 
 # (2A) download playlist
@@ -220,9 +241,6 @@ class SoundLoader(toga.App):
         toga.Font.register("FiraSans", "resources/FiraSans-Regular.ttf")
         toga.Font.register("FiraSansExtraLight", "resources/FiraSans-ExtraLight.ttf")
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
-
-        # create temp dir
-        self.create_temp_dir()
 
         # update ui
         self.show_init_layout()
@@ -776,6 +794,9 @@ class SoundLoader(toga.App):
             playlist_url = await self.fetch_playlist_url(full_stream_url)
             print(f"playlist_url={playlist_url}")
 
+            # update ui
+            self.show_preview_layout(track_filename, thumbnail_filename)
+
     # ------------------- DOWNLOAD -------------------
     async def start_download_audio(self, widget):
         print("download button clicked (start_download_audio)")
@@ -848,7 +869,10 @@ class SoundLoader(toga.App):
             # TODO show error message
             print(f"file missing at chunk0_path={chunk0_path}")
 
-        # TODO concatenate files using libav
+        # TODO concatenate files
+
+        # delete temp directory & files
+        delete_directory_recursively(self.get_temp_path())
 
         return ""
 
