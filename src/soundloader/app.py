@@ -184,11 +184,7 @@ def parse_m3u_file(file_path) -> []:
 
 
 # (2C) download chunk
-async def download_chunk(url: str, save_path: Path) -> tuple[str, str]:
-    """
-    Asynchronously downloads a file from a URL and saves it to a path.
-    Returns the URL and the path of the saved file.
-    """
+async def download_chunk(url: str, save_path: Path, index: int) -> tuple[str, str]:
     try:
         # Use httpx.AsyncClient for asynchronous requests
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -198,10 +194,7 @@ async def download_chunk(url: str, save_path: Path) -> tuple[str, str]:
 
                 # Extract filename from the URL or Content-Disposition header
                 # For simplicity, we use the last part of the URL path
-                filename = url.split('/')[-1]
-                if not filename:
-                    filename = "downloaded_file"
-
+                filename = "chunk" + str(index) + ".mp3"
                 final_path = save_path / filename
 
                 # Write content to a local file in chunks
@@ -774,23 +767,43 @@ class SoundLoader(toga.App):
         print("finished showing finished layout!")
 
     # TODO (2) asynchronously download audio
-    async def download_audio(self, playlist_url, dest_path, filename):
-        print(f"start download_audio:\nplaylist_url={playlist_url}, dest_path={dest_path}, filename={filename}")
+    async def download_audio(self, p_url, dest_path, filename):
+        print(f"start download_audio:\np_url={p_url}, dest_path={dest_path}, filename={filename}")
+
+        global chunk_urls
 
         # download playlist
-        playlist_path = await download_m3u_file(playlist_url, filename)
+        playlist_path = await download_m3u_file(p_url, filename)
         print(f"finished playlist download: playlist_path={playlist_path}")
 
         # parse playlist for chunk_urls
         chunk_urls = parse_m3u_file(playlist_path)
         print(f"finished parsing m3u: len(chunk_urls)={chunk_urls}")
 
-        # download all chunk files
+        # create a list of asynchronous tasks
+        download_tasks = [
+            download_chunk(url, toga.paths)
+            for url in chunk_urls
+        ]
 
+        # use asyncio.gather to run all tasks concurrently
+        results = await asyncio.gather(*download_tasks)
 
-    # TODO (2C) asynchronously download chunks
-    async def download_chunks(chunk_urls, dest_path):
-        print(f"start download_chunks: len(chunk_urls)={len(chunk_urls)}")
+        # process results
+        successes = 0
+        failures = 0
+        output_message = "Downloads Complete:\n"
+        for status, file_path in results:
+            output_message += f"  - {status}\n"
+            if "SUCCESS" in status:
+                successes += 1
+            else:
+                failures += 1
+
+        # download thumbnail
+
+        # concat chunks w/ thumbnail and tags
+
 
     # TODO (2D) concat chunks into mp3 w/ thumbnail and metadata
     def concat_chunk_files(chunk_dir_path, dest_filepath):
