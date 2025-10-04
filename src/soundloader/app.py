@@ -3,7 +3,7 @@ A Cloud-to-MP3 Downloader for IOS
 """
 
 import toga
-from toga.paths import paths
+from pathlib import Path
 import asyncio
 import aiohttp
 from aiohttp import ClientConnectorError
@@ -16,7 +16,6 @@ import os
 import requests
 import json
 from io import BytesIO
-from pathlib import Path
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
@@ -72,23 +71,6 @@ def get_dest_path():
         return "¯\\_(ツ)_/¯"
 
 
-# get path to temp directory
-def get_temp_path():
-    return get_dest_path() + 'temp'
-
-
-# create temp directory for temp files
-def create_temp_dir():
-    docs_path = get_dest_path()
-    try:
-        os.mkdir(docs_path)
-        print(f"Directory '{docs_path}' created successfully.")
-    except FileExistsError:
-        print(f"Directory '{docs_path}' already exists.")
-    except FileNotFoundError:
-        print(f"Parent directory for '{docs_path}' does not exist.")
-
-
 # remove prohibited characters from filename
 def sanitize_filename(filename):
     """Removes or replaces sensitive characters from a filename.
@@ -117,18 +99,11 @@ def sanitize_filename(filename):
 
 
 # (2A) download playlist
-async def download_m3u_file(url, filename) -> str:
+async def download_m3u_file(url, save_path, filename) -> str:
     """
     Asynchronously downloads a file from a URL and saves it to the app's data folder.
     """
     try:
-        # Use app.paths.data to get a suitable, writable path for the app
-        # This will be a sandboxed directory on iOS.
-        download_dir = paths.data
-        save_path = os.path.join(download_dir, filename)
-
-        # 1. Perform the network request asynchronously using asyncio.to_thread
-        # This prevents the requests call from blocking the main Toga GUI thread.
         response = await asyncio.to_thread(requests.get, url, stream=True)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
@@ -224,7 +199,7 @@ async def download_art(url: str, save_path: Path) -> str:
 
                 # set thumbnail filename
                 global thumbnail_filename
-                final_path = paths.data / thumbnail_filename
+                final_path = save_path / thumbnail_filename
 
                 # write content to a local file in chunks
                 with open(final_path, "wb") as file:
@@ -232,11 +207,10 @@ async def download_art(url: str, save_path: Path) -> str:
                         file.write(chunk)
 
                 return str(final_path)
-
     except httpx.RequestError as e:
-        return f"ERROR: Failed to download {url.split('/')[-1]}. Request error: {e}", ""
+        return f"ERROR: Failed to download {url.split('/')[-1]}. Request error: {e}"
     except Exception as e:
-        return f"ERROR: Failed to download {url.split('/')[-1]}. Unexpected error: {e}", ""
+        return f"ERROR: Failed to download {url.split('/')[-1]}. Unexpected error: {e}"
 
 
 class SoundLoader(toga.App):
@@ -247,8 +221,26 @@ class SoundLoader(toga.App):
         toga.Font.register("FiraSansExtraLight", "resources/FiraSans-ExtraLight.ttf")
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
 
+        # create temp dir
+        self.create_temp_dir()
+
         # update ui
         self.show_init_layout()
+
+    # get path to temp directory
+    def get_temp_path(self):
+        return Path(self.paths.cache) / 'temp'
+
+    # create temp directory for temp files
+    def create_temp_dir(self):
+        docs_path = str(self.get_temp_path_str())
+        try:
+            os.mkdir(docs_path)
+            print(f"Directory '{docs_path}' created successfully.")
+        except FileExistsError:
+            print(f"Directory '{docs_path}' already exists.")
+        except FileNotFoundError:
+            print(f"Parent directory for '{docs_path}' does not exist.")
 
     def show_init_layout(self):
         # main_box
@@ -819,7 +811,7 @@ class SoundLoader(toga.App):
         global thumbnail_url
 
         # download playlist
-        playlist_path = await download_m3u_file(p_url, filename)
+        playlist_path = await download_m3u_file(p_url, self.get_temp_path(), filename)
         print(f"finished playlist download: playlist_path={playlist_path}")
 
         # parse playlist for chunk_urls
@@ -828,7 +820,7 @@ class SoundLoader(toga.App):
 
         # make an array of download chunk tasks
         download_tasks = [
-            download_chunk(url, paths.data, chunk_index=i)
+            download_chunk(url, self.get_temp_path(), chunk_index=i)
             for i, url in enumerate(chunk_urls)
         ]
 
@@ -837,11 +829,11 @@ class SoundLoader(toga.App):
         print(f"finished downloading chunks to: len(chunk_urls)={len(chunk_urls)}")
 
         # download thumbnail
-        await download_art(thumbnail_url, paths.data)
-        print(f"finished downloading thumbnail to: str(paths.data)={str(paths.data)}")
+        await download_art(thumbnail_url, self.get_temp_path())
+        print(f"finished downloading thumbnail to: str(paths.data)={str(self.get_temp_path())}")
 
         # concat chunks w/ thumbnail and tags
-        complete_filepath = await self.concat_chunk_files(get_temp_path(), get_dest_path())
+        complete_filepath = await self.concat_chunk_files(str(self.get_temp_path()), get_dest_path())
         print(f"finished concat mp3 files: complete_filepath={complete_filepath}")
 
     # (2D) concat chunks into mp3
