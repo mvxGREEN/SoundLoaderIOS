@@ -74,7 +74,6 @@ def get_dest_path():
 
 # get path to temp directory
 def get_temp_path():
-    # append 'soundloader_temp' to destination directory
     return get_dest_path() + 'temp'
 
 
@@ -225,7 +224,7 @@ async def download_art(url: str, save_path: Path) -> str:
 
                 # set thumbnail filename
                 global thumbnail_filename
-                final_path = toga.paths / thumbnail_filename
+                final_path = toga.Paths / thumbnail_filename
 
                 # write content to a local file in chunks
                 with open(final_path, "wb") as file:
@@ -829,20 +828,21 @@ class SoundLoader(toga.App):
 
         # make an array of download chunk tasks
         download_tasks = [
-            download_chunk(url, toga.paths, chunk_index=i)
+            download_chunk(url, Path(get_temp_path()), chunk_index=i)
             for i, url in enumerate(chunk_urls)
         ]
 
         # use asyncio.gather to run all tasks concurrently
         results = await asyncio.gather(*download_tasks)
-        print(f"finished downloading chunks to: toga.paths{toga.paths}")
+        print(f"finished downloading chunks to: len(chunk_urls)={len(chunk_urls)}")
 
         # download thumbnail
-        await download_art(thumbnail_url, toga.paths)
-        print("finished downloading thumbnail to: toga.paths{toga.paths}")
+        await download_art(thumbnail_url, Path(get_temp_path()))
+        print(f"finished downloading thumbnail to: get_temp_path()={get_temp_path()}")
 
         # concat chunks w/ thumbnail and tags
-        await self.concat_chunk_files(toga.paths, get_dest_path())
+        complete_filepath = await self.concat_chunk_files(get_temp_path(), get_dest_path())
+        print(f"finished concat mp3 files: complete_filepath={complete_filepath}")
 
     # (2D) concat chunks into mp3
     async def concat_chunk_files(self, chunk_dir_path, dest_filepath) -> str:
@@ -855,7 +855,6 @@ class SoundLoader(toga.App):
         else:
             # TODO show error message
             print(f"file missing at chunk0_path={chunk0_path}")
-            return ""
 
         # TODO concatenate files using libav
 
