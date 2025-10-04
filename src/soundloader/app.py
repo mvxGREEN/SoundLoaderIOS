@@ -265,11 +265,11 @@ class SoundLoader(toga.App):
         self.main_box = toga.Box(direction=COLUMN)
 
         # webview
-        self.webview = toga.WebView(
-            on_webview_load=self.on_page_loaded,
-            style=Pack(flex=0)
-        )
-        self.webview.style.visibility = 'hidden'
+        #self.webview = toga.WebView(
+        #    on_webview_load=self.on_page_loaded,
+        #    style=Pack(flex=0)
+        #)
+        #self.webview.style.visibility = 'hidden'
 
         # hint_box
         hint_label = toga.Label(
