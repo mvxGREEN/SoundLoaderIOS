@@ -39,6 +39,7 @@ full_stream_url = ""
 playlist_url = ""
 chunk_urls = [""]
 track_filename = ""
+thumbnail_filename = ""
 thumbnail_url = ""
 track_title = ""
 track_artist = ""
@@ -184,7 +185,8 @@ def parse_m3u_file(file_path) -> []:
 
 
 # (2C) download chunk
-async def download_chunk(url: str, save_path: Path, index: int) -> tuple[str, str]:
+async def download_chunk(url: str, dir_path: Path, chunk_index: int) -> str:
+    print(f"start download_chunk:\nurl={url}\ndir_path={dir_path}\nchunk_index={chunk_index}")
     try:
         # Use httpx.AsyncClient for asynchronous requests
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -194,15 +196,43 @@ async def download_chunk(url: str, save_path: Path, index: int) -> tuple[str, st
 
                 # Extract filename from the URL or Content-Disposition header
                 # For simplicity, we use the last part of the URL path
-                filename = "chunk" + str(index) + ".mp3"
-                final_path = save_path / filename
+                filename = "chunk" + str(chunk_index) + ".mp3"
+                final_path = dir_path / filename
 
                 # Write content to a local file in chunks
                 with open(final_path, "wb") as file:
                     async for chunk in response.aiter_bytes():
                         file.write(chunk)
 
-                return filename, str(final_path)
+                return str(final_path)
+
+    except httpx.RequestError as e:
+        print(f"failed to download {url.split('/')[-1]}.\nrequest error: {e}")
+        return ""
+    except Exception as e:
+        f"failed to download {url.split('/')[-1]}. unexpected error: {e}"
+        return ""
+
+
+# (2C) download thumbnail
+async def download_art(url: str, save_path: Path) -> str:
+    try:
+        # Use httpx.AsyncClient for asynchronous requests
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Use stream=True for large files
+            async with client.stream("GET", url) as response:
+                response.raise_for_status()  # Raise exception for bad status codes
+
+                # set thumbnail filename
+                global thumbnail_filename
+                final_path = toga.paths / thumbnail_filename
+
+                # write content to a local file in chunks
+                with open(final_path, "wb") as file:
+                    async for chunk in response.aiter_bytes():
+                        file.write(chunk)
+
+                return str(final_path)
 
     except httpx.RequestError as e:
         return f"ERROR: Failed to download {url.split('/')[-1]}. Request error: {e}", ""
@@ -635,7 +665,7 @@ class SoundLoader(toga.App):
             # Handle other unexpected errors
             return f"An unexpected error occurred: {e}"
 
-    async def _process_fetch(self, url):
+    async def fetch_playlist_url(self, url) -> str:
         """
         Background task to await the fetch and update the UI.
         """
@@ -651,9 +681,7 @@ class SoundLoader(toga.App):
             print(f"found playlist_url={playlist_url}")
         else:
             print(f"missing playlist_url in json_str={json_str}")
-
-        # update ui
-        self.show_preview_layout(track_filename, thumbnail_url)
+        return playlist_url
 
     # on load click
     async def start_load_audio(self, widget):
@@ -661,6 +689,7 @@ class SoundLoader(toga.App):
         global player_url
         global stream_url
         global track_filename
+        global thumbnail_filename
         global thumbnail_url
         global track_title
         global track_artist
@@ -687,11 +716,6 @@ class SoundLoader(toga.App):
             html = await self.get_html_from(input_url)
             print(f"finished get_html_from: len(html)={len(html)}")
 
-            # exit if html too small TODO show error message
-            if len(html) < 300:
-                print("exiting load_audio; html too short")
-                return
-
             # extract player url
             player_url = self.extract_player_url(html)
             print(f"found player_url={player_url}")
@@ -703,13 +727,13 @@ class SoundLoader(toga.App):
                 stream_url = STREAM_URL_BEGIN + html[start:end] + STREAM_URL_END
                 print(f"stream_url={stream_url}")
             else:
-                # TODO show error message if missing stream_url
+                # TODO show error message
                 print(f"missing stream id in: player_url={player_url}")
 
             # load player in webiew
             # self.load_in_webview(player_url)
 
-            # extract thumbnail_url, filename and metadata
+            # extract thumbnail, filename and metadata
             res = self.extract_info(html)
             track_filename = res[0]
             thumbnail_url = res[1]
@@ -721,24 +745,45 @@ class SoundLoader(toga.App):
             # sanitize filename
             track_filename = sanitize_filename(track_filename)
 
-            # convert webp thumbnail to jpg
-            if thumbnail_url.endswith(".webp"):
+            # set thumbnail resolution
+            if "-large" in thumbnail_url:
+                print("changed resolution of thumbnail_url to t500x500")
+                thumbnail_url.replace("-large", "-t500x500")
+            else:
+                print(f"kept resolution of thumbnail_url")
+
+            # set thumbnail filename
+            if thumbnail_url.endswith(".jpg"):
+                # handle jpg
+                thumbnail_filename = track_filename + ".jpg"
+            elif thumbnail_url.endswith(".webp"):
+                # convert webp to jpg
+                thumbnail_filename = track_filename + ".jpg"
                 thumbnail_url = thumbnail_url.replace("vi_webp", "vi")
                 thumbnail_url = thumbnail_url.replace(".webp", ".jpg")
+            elif thumbnail_url.endswith(".png"):
+                # handle png
+                thumbnail_filename = track_filename + ".png"
+            else:
+                # handle unexpected file extension
+                thumbnail_filename = track_filename + thumbnail_url[thumbnail_url.rfind('.')]
+                print(f"unexpected file extension: thumbnail_url={thumbnail_url}")
+            print(f"thumbnail_filename={thumbnail_filename}")
 
-            # get client_id
+            # get client id
             global client_id
             client_id = await self.get_client_id_from("https://a-v2.sndcdn.com/assets/0-2e3ca6a5.js")
             print(f"client_id={client_id}")
 
-            # build full_stream_url
+            # build full stream url
             global full_stream_url
             full_stream_url = stream_url + "?client_id=" + client_id  # + "&app_version=1759307428&app_locale=en"
             print(f"full_stream_url={full_stream_url}")
 
-            # request json
-            await self._process_fetch(full_stream_url)
-            print("_process_fetch finished!")
+            # get playlist url
+            global playlist_url
+            playlist_url = await self.fetch_playlist_url(full_stream_url)
+            print(f"playlist_url={playlist_url}")
 
     # ------------------- DOWNLOAD -------------------
     async def start_download_audio(self, widget):
@@ -771,6 +816,8 @@ class SoundLoader(toga.App):
         print(f"start download_audio:\np_url={p_url}, dest_path={dest_path}, filename={filename}")
 
         global chunk_urls
+        global thumbnail_filename
+        global thumbnail_url
 
         # download playlist
         playlist_path = await download_m3u_file(p_url, filename)
@@ -780,34 +827,39 @@ class SoundLoader(toga.App):
         chunk_urls = parse_m3u_file(playlist_path)
         print(f"finished parsing m3u: len(chunk_urls)={chunk_urls}")
 
-        # create a list of asynchronous tasks
+        # make an array of download chunk tasks
         download_tasks = [
-            download_chunk(url, toga.paths)
-            for url in chunk_urls
+            download_chunk(url, toga.paths, chunk_index=i)
+            for i, url in enumerate(chunk_urls)
         ]
 
         # use asyncio.gather to run all tasks concurrently
         results = await asyncio.gather(*download_tasks)
-
-        # process results
-        successes = 0
-        failures = 0
-        output_message = "Downloads Complete:\n"
-        for status, file_path in results:
-            output_message += f"  - {status}\n"
-            if "SUCCESS" in status:
-                successes += 1
-            else:
-                failures += 1
+        print(f"finished downloading chunks to: toga.paths{toga.paths}")
 
         # download thumbnail
+        await download_art(thumbnail_url, toga.paths)
+        print("finished downloading thumbnail to: toga.paths{toga.paths}")
 
         # concat chunks w/ thumbnail and tags
+        await self.concat_chunk_files(toga.paths, get_dest_path())
 
+    # (2D) concat chunks into mp3
+    async def concat_chunk_files(self, chunk_dir_path, dest_filepath) -> str:
+        print(f"start concat_chunk_files: chunk_dir_path={chunk_dir_path}, dest_filepath={dest_filepath}")
 
-    # TODO (2D) concat chunks into mp3 w/ thumbnail and metadata
-    def concat_chunk_files(chunk_dir_path, dest_filepath):
-        print("start concat_chunk_files")
+        # check if chunk0 exists
+        chunk0_path = chunk_dir_path + "chunk0.mp3"
+        if os.path.isfile(chunk0_path):
+            print(f"file exists at chunk0_path={chunk0_path}")
+        else:
+            # TODO show error message
+            print(f"file missing at chunk0_path={chunk0_path}")
+            return ""
+
+        # TODO concatenate files using libav
+
+        return ""
 
 
 async def main():
