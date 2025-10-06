@@ -23,7 +23,7 @@ from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 from rubicon.objc import ObjCClass
-from myapp.ios.ios_audio_concatenator import AudioConcatenator
+from soundloader.ios.ios_audio_concatenator import AudioConcatenator
 
 # global constants
 TWITTER_PLAYER = "twitter:player"
