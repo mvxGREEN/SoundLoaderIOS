@@ -14,11 +14,16 @@ import random
 import sys
 import os
 import requests
+from requests.exceptions import SSLError
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
 import json
 from io import BytesIO
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
+from rubicon.objc import ObjCClass
+from myapp.ios.ios_audio_concatenator import AudioConcatenator
 
 # global constants
 TWITTER_PLAYER = "twitter:player"
@@ -43,12 +48,8 @@ thumbnail_url = ""
 track_title = ""
 track_artist = ""
 
-
-# TODO uncomment
-# from rubicon.objc import ObjCClass
-
-# expose objc TODO uncomment
-# UIPasteboard = ObjCClass('UIPasteboard')
+# objective-c classes
+UIPasteboard = ObjCClass('UIPasteboard')
 
 
 # get path to destination directory
@@ -124,8 +125,9 @@ async def download_m3u_file(url, save_path, filename) -> str:
     """
     Asynchronously downloads a file from a URL and saves it to the app's data folder.
     """
+    save_path += filename
     try:
-        response = await asyncio.to_thread(requests.get, url, stream=True)
+        response = await asyncio.to_thread(requests.get, url, stream=True, verify=False)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
         # 2. Save the file content in chunks
@@ -241,6 +243,8 @@ class SoundLoader(toga.App):
         toga.Font.register("FiraSans", "resources/FiraSans-Regular.ttf")
         toga.Font.register("FiraSansExtraLight", "resources/FiraSans-ExtraLight.ttf")
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
+
+        # create python-to-iOS bridge
 
         # update ui
         self.show_init_layout()
@@ -374,7 +378,7 @@ class SoundLoader(toga.App):
     def show_preview_layout(self, filename, thumbnail_url):
         try:
             # try load thumbnail into image_view
-            response = requests.get(thumbnail_url)
+            response = requests.get(thumbnail_url, verify=False)
             response.raise_for_status()  # Raise an exception for bad status codes
             image_bytes = BytesIO(response.content)
             toga_image = toga.Image(src=image_bytes.read())
@@ -458,16 +462,22 @@ class SoundLoader(toga.App):
     # paste copied text into url_input TODO uncomment
     def paste_action(self):
         print("paste_action")
+        
         # Get the general pasteboard instance
-        # pasteboard = UIPasteboard.generalPasteboard
+        pasteboard = UIPasteboard.generalPasteboard
 
         # Get the string content from the pasteboard
-        # pasted_text = pasteboard.string
+        pasted_text = pasteboard.string
 
         # Check if there is any text to paste
-        # if pasted_text:
-        # Set the value of the TextInput to the pasted text
-        # self.url_input.value = pasted_text
+        if len(pasted_text) > 0:
+            # Set the value of the TextInput to the pasted text
+            # TODO uncomment
+            # test: self.url_input.value = "https://google.com/"
+            self.url_input.value = pasted_text
+        else:
+            print("no text copied!")
+            # TODO show gentle reminder to copy a URL
 
     # clear text from url_input
     def clear_action(self):
@@ -485,6 +495,10 @@ class SoundLoader(toga.App):
         Returns:
             The HTML content as a string, or None if an error occurs.
         """
+        
+        # ⚠️ Suppress the warning that appears when disabling SSL verification
+        urllib3.disable_warnings(InsecureRequestWarning)
+        
         try:
             # Create an aiohttp ClientSession. It's recommended to use a context manager
             # (the 'async with' block) for the session to ensure resources are properly released.
@@ -492,7 +506,7 @@ class SoundLoader(toga.App):
                 # Send an asynchronous GET request to the URL.
                 # The 'async with' block for the response ensures the connection is closed.
                 # Raise an exception for bad status codes (4xx or 5xx)
-                async with session.get(url) as response:
+                async with session.get(url, ssl=False) as response:
                     response.raise_for_status()
 
                     # Read the response content as text (HTML in this case).
@@ -618,7 +632,7 @@ class SoundLoader(toga.App):
             # execute js request
             response = await self.loop.run_in_executor(
                 None,
-                lambda: requests.get(js_url, timeout=10)
+                lambda: requests.get(js_url, timeout=10, verify=False)
             )
 
             # check for success
@@ -795,7 +809,7 @@ class SoundLoader(toga.App):
             print(f"playlist_url={playlist_url}")
 
             # update ui
-            self.show_preview_layout(track_filename, thumbnail_filename)
+            self.show_preview_layout(track_filename, thumbnail_url)
 
     # ------------------- DOWNLOAD -------------------
     async def start_download_audio(self, widget):
@@ -827,15 +841,16 @@ class SoundLoader(toga.App):
         print("finished showing finished layout!")
 
     # TODO (2) asynchronously download audio
-    async def download_audio(self, p_url, dest_path, filename):
-        print(f"start download_audio:\np_url={p_url}, dest_path={dest_path}, filename={filename}")
+    async def download_audio(self, og_url, dest_path, filename):
+        print(f"start download_audio:\og_url={og_url}, dest_path={dest_path}, filename={filename}")
 
         global chunk_urls
         global thumbnail_filename
         global thumbnail_url
+        global playlist_url
 
         # download playlist
-        playlist_path = await download_m3u_file(p_url, self.get_temp_path(), filename)
+        playlist_path = await download_m3u_file(playlist_url, str(self.get_temp_path()), filename)
         print(f"finished playlist download: playlist_path={playlist_path}")
 
         # parse playlist for chunk_urls
@@ -865,7 +880,7 @@ class SoundLoader(toga.App):
         print(f"start concat_chunk_files: chunk_dir_path={chunk_dir_path}, dest_filepath={dest_filepath}")
 
         # check if chunk0 exists
-        chunk0_path = chunk_dir_path + "chunk0.mp3"
+        chunk0_path = chunk_dir_path + "/chunk0.mp3"
         if os.path.isfile(chunk0_path):
             print(f"file exists at chunk0_path={chunk0_path}")
         else:

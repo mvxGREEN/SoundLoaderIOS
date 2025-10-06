@@ -13,7 +13,7 @@ formal_name = "SoundLoader"
 description = "The Cloud-to-MP3 Downloader for IOS"
 long_description = """The Cloud-to-MP3 Downloader for IOS
 """
-icon = "icons/savefrom"
+icon = "icons/soundloader"
 splash_background_color = "#000000"
 
 sources = [
