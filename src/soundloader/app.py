@@ -34,6 +34,7 @@ BASE_URL_THUMBNAIL = "i1.sndcdn.com/a"
 STREAM_ID_BEGIN = "media/soundcloud:tracks:"
 STREAM_ID_END = "/stream"
 FLAG_CLIENT_ID = "client_id:u?"
+TEST_STREAM_ID = "151531814"
 
 # global variables
 player_url = ""
@@ -101,7 +102,7 @@ def sanitize_filename(filename):
 
 # delete directory and all its files and subfolders
 def delete_directory_recursively(directory_path):
-    print(f"delete_recursively: directory_path={directory_path}")
+    print(f"delete_directory_recursively: directory_path={directory_path}")
 
     # check if dir exists
     if not os.path.exists(directory_path):
@@ -168,6 +169,14 @@ def parse_m3u_file(file_path) -> []:
             for line in f:
                 # Remove leading/trailing whitespace and newline characters
                 clean_line = line.strip()
+                
+                # add init.mp4 url
+                if "EXT-X-MAP" in clean_line:
+                    start = clean_line.find("https")
+                    end = clean_line.rfind('"')
+                    init_chunk_url = clean_line[start:end]
+                    urls.append(init_chunk_url)
+                    print(f"found and added init_chunk_url={init_chunk_url}")
 
                 # Ignore comments/metadata lines (which start with '#')
                 if clean_line and not clean_line.startswith('#'):
@@ -193,7 +202,10 @@ async def download_chunk(url: str, dir_path: Path, chunk_index: int) -> str:
 
                 # Extract filename from the URL or Content-Disposition header
                 # For simplicity, we use the last part of the URL path
-                filename = "chunk" + str(chunk_index) + ".mp3"
+                filename = "chunk" + str(chunk_index) + ".m4s"
+                # the initialization segment is special and gets its own name and .mp4 extension
+                if chunk_index == 0:
+                    filename = "init.mp4"
                 final_path = dir_path / filename
 
                 # Write content to a local file in chunks
@@ -245,7 +257,8 @@ class SoundLoader(toga.App):
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
 
         # create python-to-iOS bridge
-
+        self.concatenator = AudioConcatenator()
+        
         # update ui
         self.show_init_layout()
 
@@ -470,7 +483,7 @@ class SoundLoader(toga.App):
         pasted_text = pasteboard.string
 
         # Check if there is any text to paste
-        if len(pasted_text) > 0:
+        if not str(pasted_text) is None:
             # Set the value of the TextInput to the pasted text
             # TODO uncomment
             # test: self.url_input.value = "https://google.com/"
@@ -530,6 +543,13 @@ class SoundLoader(toga.App):
     # (1B) parse html for player_url
     def extract_player_url(self, html) -> str:
         print(f"extract_player_url: len(html)={len(html)}")
+        
+        # check for test stream id
+        if TEST_STREAM_ID in html:
+        # TODO extract stream id
+            print(f"found test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
+        else:
+            print(f"missing test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
 
         if TWITTER_PLAYER in html:
             print("found TWITTER_PLAYER in html")
@@ -579,6 +599,13 @@ class SoundLoader(toga.App):
     # (1E) extract filename, thumbnail_url, metadata
     def extract_info(self, html) -> tuple[str, str, str, str]:
         print(f"extract_info: len(html)={len(html)}")
+        
+        # check for test stream id
+        if TEST_STREAM_ID in html:
+        # TODO extract stream id
+            print(f"found test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
+        else:
+            print(f"missing test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
 
         # extract filename
         filename = "soundloader_download"
@@ -640,7 +667,15 @@ class SoundLoader(toga.App):
 
             # get js as string
             js_content = response.text
-
+            print(f"received javascript: js_content{js_content}")
+            
+            # check for test stream id
+            if TEST_STREAM_ID in js_content:
+            # TODO extract stream id
+                print(f"found test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
+            else:
+                print(f"missing test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
+                                
             # extract client_id
             if 'client_id=' in js_content:
                 start = js_content.find('client_id=') + 10
@@ -662,9 +697,6 @@ class SoundLoader(toga.App):
 
     # (1G) request json w/ response handler
     async def get_json_as_string(self, url: str) -> str:
-        """
-        Asynchronously fetches JSON data from a URL and returns it as a string.
-        """
         print(f"start get_json_as_string: url={url}")
         try:
             async with httpx.AsyncClient() as client:
@@ -675,6 +707,14 @@ class SoundLoader(toga.App):
 
                 # get the response content as a string
                 json_string = response.text
+                print(f"received json_string={json_string}")
+                
+                # check for test stream id
+                if TEST_STREAM_ID in json_string:
+                    # TODO extract stream id
+                    print(f"found test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
+                else:
+                    print(f"missing test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
 
                 return json_string
 
@@ -694,7 +734,7 @@ class SoundLoader(toga.App):
         """
         global playlist_url
         json_str = await self.get_json_as_string(url)
-        print("finished request json")
+        print(f"finished request json_str={json_str}")
 
         # get playlist_url from json
         if "https://" in json_str:
@@ -737,7 +777,7 @@ class SoundLoader(toga.App):
             # await player_url
             input_url = self.url_input.value
             html = await self.get_html_from(input_url)
-            print(f"finished get_html_from: len(html)={len(html)}")
+            print(f"finished get_html_from: html={html}")
 
             # extract player url
             player_url = self.extract_player_url(html)
@@ -745,8 +785,8 @@ class SoundLoader(toga.App):
 
             # extract last stream url
             if STREAM_ID_BEGIN in html and STREAM_ID_END in html:
-                start = html.rfind(STREAM_ID_BEGIN) + len(STREAM_ID_BEGIN)
-                end = html.rfind(STREAM_ID_END)
+                start = html.find(STREAM_ID_BEGIN) + len(STREAM_ID_BEGIN)
+                end = html.find(STREAM_ID_END)
                 stream_url = STREAM_URL_BEGIN + html[start:end] + STREAM_URL_END
                 print(f"stream_url={stream_url}")
             else:
@@ -755,6 +795,12 @@ class SoundLoader(toga.App):
 
             # load player in webiew
             # self.load_in_webview(player_url)
+            
+            # check for progressive stream
+            if "stream/progressive" in html:
+                print("found stream/progressive !")
+            else:
+                print("missing stream/progressive !")
 
             # extract thumbnail, filename and metadata
             res = self.extract_info(html)
@@ -833,7 +879,7 @@ class SoundLoader(toga.App):
         print(f"finished download_audio task")
 
         # get path to saved file
-        file_path_dest = get_dest_path() + f"{self.filename_input.value}" + ".mp3"
+        file_path_dest = get_dest_path() + f"{self.filename_input.value}" + ".mp4"
         print(f"file_path_dest={file_path_dest}")
 
         # update ui
@@ -842,12 +888,13 @@ class SoundLoader(toga.App):
 
     # TODO (2) asynchronously download audio
     async def download_audio(self, og_url, dest_path, filename):
-        print(f"start download_audio:\og_url={og_url}, dest_path={dest_path}, filename={filename}")
+        print(f"start download_audio: dest_path={dest_path}, filename={filename}")
 
         global chunk_urls
         global thumbnail_filename
         global thumbnail_url
         global playlist_url
+        global track_filename
 
         # download playlist
         playlist_path = await download_m3u_file(playlist_url, str(self.get_temp_path()), filename)
@@ -857,7 +904,7 @@ class SoundLoader(toga.App):
         chunk_urls = parse_m3u_file(playlist_path)
         print(f"finished parsing m3u: len(chunk_urls)={chunk_urls}")
 
-        # make an array of download chunk tasks
+        # make an array of download tasks for each chunk url
         download_tasks = [
             download_chunk(url, self.get_temp_path(), chunk_index=i)
             for i, url in enumerate(chunk_urls)
@@ -865,34 +912,88 @@ class SoundLoader(toga.App):
 
         # use asyncio.gather to run all tasks concurrently
         results = await asyncio.gather(*download_tasks)
-        print(f"finished downloading chunks to: len(chunk_urls)={len(chunk_urls)}")
+        print(f"finished downloading chunks: len(chunk_urls)={len(chunk_urls)}")
 
         # download thumbnail
         await download_art(thumbnail_url, self.get_temp_path())
         print(f"finished downloading thumbnail to: str(paths.data)={str(self.get_temp_path())}")
-
-        # concat chunks w/ thumbnail and tags
-        complete_filepath = await self.concat_chunk_files(str(self.get_temp_path()), get_dest_path())
-        print(f"finished concat mp3 files: complete_filepath={complete_filepath}")
-
-    # (2D) concat chunks into mp3
-    async def concat_chunk_files(self, chunk_dir_path, dest_filepath) -> str:
-        print(f"start concat_chunk_files: chunk_dir_path={chunk_dir_path}, dest_filepath={dest_filepath}")
-
-        # check if chunk0 exists
-        chunk0_path = chunk_dir_path + "/chunk0.mp3"
-        if os.path.isfile(chunk0_path):
-            print(f"file exists at chunk0_path={chunk0_path}")
+        
+        # check for initialization chunk
+        file_ext = ".m4s"
+        init_chunk_filepath = str(self.get_temp_path()) + "/init.mp4"
+        if (os.path.isfile(init_chunk_filepath)):
+            print(f"found init chunk at: init_chunk_filepath={init_chunk_filepath}")
         else:
-            # TODO show error message
-            print(f"file missing at chunk0_path={chunk0_path}")
-
-        # TODO concatenate files
-
-        # delete temp directory & files
+            # TODO show error message and exit gracefully
+            print(f"missing init chunk at: init_chunk_filepath={init_chunk_filepath}")
+            
+        # get chunk paths and destination path
+        chunk_paths = [init_chunk_filepath]
+        for index, url in enumerate(chunk_urls):
+            if index != 0:
+                chunkpath = str(self.get_temp_path()) + "/chunk" + str(index) + file_ext
+                chunk_paths.append(chunkpath)
+        dest_filepath = get_dest_path() + track_filename + ".mp4"
+        
+        # start concatenating
+        success = await self.concatenate_m4_segments(chunk_paths, dest_filepath)
+        if success:
+            print(f"SUCCESS concat chunk files: str(len(chunk_paths))={str(len(chunk_paths))} dest_filepath={dest_filepath}")
+        else:
+            print(f"ERROR concat chunk files: str(len(chunk_paths))={str(len(chunk_paths))} dest_filepath={dest_filepath}")
+            
+        # TODO add image & tags
+            
+        # delete temp files
         delete_directory_recursively(self.get_temp_path())
+        
+    async def concatenate_and_report(self, inputs, output):
+        try:
+            print('Starting concatenation...')
+            
+            # The .concatenate_audio_files() method returns a Future
+            await self.concatenator.concatenate_audio_files(inputs, output)
+            
+            print(f'Concatenation complete! File saved to: {output}')
+            
+        except Exception as e:
+            # TODO show error message
+            print(f'Error concatenating files: {e}')
+        finally:
+            delete_directory_recursively(self.get_temp_path())
+            
+    async def concatenate_m4_segments(self, file_list, output_path) -> bool:
+        """
+        Concatenates a list of .m4s or .mp4 segments into a single fragmented MP4 file.
 
-        return ""
+        :param file_list: A list of full file paths, starting with the init segment.
+        :param output_path: The full path for the final concatenated MP4 file.
+        :return: True on success, False otherwise.
+        """
+        if not file_list:
+            print("Error: File list is empty.")
+            return False
+        
+        try:
+            with open(output_path, 'wb') as outfile:
+                for filepath in file_list:
+                    with open(filepath, 'rb') as infile:
+                        # Read the segment content
+                        content = infile.read()
+                        # Write it to the final output file
+                        outfile.write(content)
+            
+            print(f"Successfully concatenated files to: {output_path}")
+            return True
+        
+        except FileNotFoundError as e:
+            print(f"Error: One of the files was not found: {e}")
+            return False
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            return False
+
+            
 
 
 async def main():
