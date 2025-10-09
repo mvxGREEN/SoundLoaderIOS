@@ -22,8 +22,13 @@ from io import BytesIO
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
-from rubicon.objc import ObjCClass
 from mutagen.mp4 import MP4, MP4Cover
+
+# ios imports
+if sys.platform == 'ios':
+    from rubicon.objc import ObjCClass
+    UIPasteboard = ObjCClass('UIPasteboard')
+
 
 # global constants
 TWITTER_PLAYER = "twitter:player"
@@ -48,9 +53,6 @@ thumbnail_filename = ""
 thumbnail_url = ""
 track_title = ""
 track_artist = ""
-
-# objective-c classes
-UIPasteboard = ObjCClass('UIPasteboard')
 
 
 # get path to destination directory
@@ -472,19 +474,22 @@ class SoundLoader(toga.App):
     # paste copied text into url_input
     async def paste_action(self):
         print("paste_action")
-        
-        # Get the general pasteboard instance
-        pasteboard = UIPasteboard.generalPasteboard
 
-        # Get the string content from the pasteboard
-        pasted_text = pasteboard.string
+        if sys.platform == 'ios':
+            # Get the general pasteboard instance
+            pasteboard = UIPasteboard.generalPasteboard
 
-        # check if there is any text to paste
-        if not str(pasted_text) is None:
-            self.url_input.value = pasted_text
+            # Get the string content from the pasteboard
+            pasted_text = pasteboard.string
+
+            # check if there is any text to paste
+            if not str(pasted_text) is None:
+                self.url_input.value = pasted_text
+            else:
+                print("no text copied!")
+                await self.show_message_handler("Invalid Input", "Please copy a valid URL…\nEx. https://on.sound…")
         else:
-            print("no text copied!")
-            await self.show_message_handler("Invalid Input", "Please copy a valid URL…\nEx. https://on.sound…")
+            print("paste_action not implemented for OS")
 
     # clear text from url_input
     def clear_action(self):

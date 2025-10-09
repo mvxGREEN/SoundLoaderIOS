@@ -26,9 +26,9 @@ test_sources = [
 requires = [
     "requests",
     "asyncio",
-    "rubicon-objc",
     "aiohttp",
-    "httpx"
+    "httpx",
+    "mutagen",
 ]
 test_requires = [
     "pytest"
@@ -177,6 +177,7 @@ requires = [
 requires = [
     "toga-iOS~=0.5.0",
     "std-nslog~=1.0.3",
+    "rubicon-objc",
 ]
 
 [tool.briefcase.app.soundloader.android]
