@@ -20,7 +20,7 @@ from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 from mutagen.mp4 import MP4, MP4Cover
-from toga.sources import ListSource
+from toga.sources import ListSource, Row
 
 # ios imports
 if sys.platform == 'ios':
@@ -261,20 +261,16 @@ class SoundLoader(toga.App):
         self.storage_dir: Path = self.paths.data
         if not self.storage_dir.exists():
             self.storage_dir.mkdir(parents=True)
+        print(f"scanning files in app dir: {str(self.storage_dir)}")
 
-        # ⭐️ 1. Store the full list of files (the master data)
+        # files list
         self.all_files = []
-
-        # 2. The ListSource will hold the filtered/visible data
-        self.file_list_data = ListSource(
-            accessors=['filename', 'full_path'],
-            data=[]
-        )
+        self.filtered_files = self.all_files
 
         # init ui
         self.show_init_layout()
 
-        # init scan
+        # run initial scan
         self.initial_scan()
 
     # get path to temp directory
@@ -298,7 +294,7 @@ class SoundLoader(toga.App):
     def initial_scan(self):
         """Scans the directory and populates the master list."""
 
-        # 1. Collect all .m4a files into the master list
+        # collect all .m4a files into the master list
         self.all_files = []
         for file_path in self.storage_dir.rglob('*.m4a'):
             if file_path.is_file():
@@ -308,8 +304,12 @@ class SoundLoader(toga.App):
                 })
 
         print(f"Total files found: {len(self.all_files)}")
+        first_item = self.all_files[0]
+        print(f"Keys in first data item: {list(first_item.keys())}")
+        print(f"Filename value: {first_item.get('filename')}")
+        print(f"Full path value: {first_item.get('full_path')}")
 
-        # 2. After a new scan, apply the current filter (which might be empty)
+        # after initial scan, apply the current filter (which might be empty)
         self.filter_files(self.search_input)
 
     def filter_files(self, text_input):
@@ -333,7 +333,8 @@ class SoundLoader(toga.App):
             ]
 
         # 4. Update the ListSource (this refreshes the Toga Table)
-        self.file_list_data.data = filtered_data
+        print(f"filtered_data={filtered_data}")
+        self.file_table.data = filtered_data
 
     def show_init_layout(self):
         # main_box
@@ -372,13 +373,16 @@ class SoundLoader(toga.App):
 
         # files box
         self.file_table = toga.Table(
-            headings=["File Name"],
-            data=self.file_list_data,
-            accessors=['filename'],
+            headings=['File Name', 'File Path'],
+            data=self.all_files,
+            accessors=['filename', 'full_path'],
             style=Pack(flex=1),
             on_select=self.play_m4a_file
         )
-        self.main_box.add(self.file_table)
+        self.file_table_box = toga.Box(children=[self.file_table], direction=COLUMN)
+        self.main_box.add(self.file_table_box)
+
+        print(f"table data: {str(self.file_table.data)}")
 
         # preview_box
         self.preview_box = toga.Box(direction=COLUMN)
@@ -608,6 +612,9 @@ class SoundLoader(toga.App):
         self.filter_files(self.search_input)
 
     async def pick_file_action(self):
+        # init scan
+        self.initial_scan()
+
         try:
             # Use the platform-native file picker to select a file
             selected_file = await self.main_window.open_file_dialog(
@@ -618,15 +625,6 @@ class SoundLoader(toga.App):
                 multiple_select=True,
                 on_result=self.handle_file_pick
             )
-
-            if selected_file:
-                # The 'selected_file' will be a list of pathlib.Path objects
-                # You would then process these files, perhaps copying them
-                # into your app's 'data' directory for continued access.
-                print(f"User selected files: {selected_file}")
-                # ... logic to copy and add to the ListSource ...
-            else:
-                print("No file selected.")
 
         except Exception as e:
             print(f"Error during file selection: {e}")
