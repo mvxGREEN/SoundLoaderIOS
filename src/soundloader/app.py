@@ -251,6 +251,9 @@ async def download_art(url: str, save_path: Path) -> str:
 
 
 class SoundLoader(toga.App):
+    all_files = []
+    file_list_data = []
+
     # startup
     def startup(self):
         # register fonts
@@ -369,6 +372,16 @@ class SoundLoader(toga.App):
         self.url_box.add(self.load_button)
         self.main_box.add(self.url_box)
 
+        # files box
+        self.file_table = toga.Table(
+            headings=["File Name"],
+            data=self.file_list_data,
+            accessors=['filename'],
+            style=Pack(flex=1),
+            on_select=self.play_m4a_file
+        )
+        self.main_box.add(self.files_table)
+
         # preview_box
         self.preview_box = toga.Box(direction=COLUMN)
         self.main_box.add(self.preview_box)
@@ -408,17 +421,6 @@ class SoundLoader(toga.App):
         self.filename_input_label.style.visibility = 'hidden'
         self.filename_input.style.visibility = 'hidden'
         self.download_button.style.visibility = 'hidden'
-
-        # files box
-        self.files_box = toga.Box(direction=COLUMN)
-        self.file_table = toga.Table(
-            headings=["File Name"],
-            data=self.file_list_data,
-            accessors=['filename'],
-            style=Pack(flex=1),
-            on_select=self.play_m4a_file
-        )
-        self.main_box.add(self.files_box)
 
         # main_window
         self.main_window = toga.MainWindow(title="SoundLoader")
