@@ -278,8 +278,6 @@ class SoundLoader(toga.App):
         # init scan
         self.initial_scan()
 
-
-
     # get path to temp directory
     def get_temp_path(self):
         return Path(self.paths.cache) / 'temp'
@@ -592,14 +590,21 @@ class SoundLoader(toga.App):
         print("clear_action")
         self.search_input.value = ""
 
+    async def handle_file_pick(self, file_paths):
+        print(f"handle_file_paths: len(file_paths)={file_paths}")
+
+        # TODO add files at file paths to listsource & update ui
+
     async def pick_file_action(self):
         try:
             # Use the platform-native file picker to select a file
             selected_file = await self.main_window.show_open_dialog(
                 title="Select M4A File",
+                initial_directory=self.storage_dir,
                 # iOS-specific file types are handled by the Toga backend
                 file_types=['m4a', 'm4b'],
-                multiselect=True
+                multiselect=True,
+                on_result=self.handle_file_pick
             )
 
             if selected_file:
