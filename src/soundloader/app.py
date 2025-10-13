@@ -20,6 +20,8 @@ from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 from mutagen.mp4 import MP4, MP4Cover
+from tinytag import TinyTag
+import io
 from toga.sources import ListSource, Row
 
 # ios imports
@@ -54,6 +56,55 @@ thumbnail_filename = ""
 thumbnail_url = ""
 track_title = ""
 track_artist = ""
+
+
+def get_m4a_metadata(file_path):
+    """
+    Extracts metadata, duration, and thumbnail from an M4A file.
+
+    :param file_path: A string path to the M4A file.
+    :return: A dictionary containing the extracted metadata.
+    """
+    try:
+        # Convert the string path to a Path object for TinyTag
+        file_path_obj = Path(file_path)
+
+        # Get the tag data
+        tag = TinyTag.get(file_path_obj)
+
+        # Basic tags and duration
+        metadata = {
+            'title': tag.title,
+            'artist': tag.artist,
+            'album': tag.album,
+            'genre': tag.genre,
+            'year': tag.year,
+            'duration': tag.duration,  # in seconds (float)
+            'track': tag.track,
+            'disc': tag.disc,
+        }
+
+        # Get the thumbnail/artwork
+        # TinyTag's 'get_image()' method (or tag.images.any in newer versions)
+        # returns the raw image data (bytes) for the first image found.
+        image_data = tag.get_image()
+
+        # Convert image data (bytes) to a Toga Image object
+        toga_image = None
+        if image_data:
+            # Toga can load an image from a bytes stream
+            toga_image = toga.Image(stream=io.BytesIO(image_data))
+
+        metadata['thumbnail'] = toga_image
+
+        return metadata
+
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
 
 
 # get path to destination directory
@@ -298,6 +349,20 @@ class SoundLoader(toga.App):
         self.all_files = []
         for file_path in self.storage_dir.rglob('*.m4a'):
             if file_path.is_file():
+
+                # get metadata
+                metadata = get_m4a_metadata(str(file_path))
+
+                if metadata:
+                    print(f"Title: {metadata['title']}")
+                    print(f"Artist: {metadata['artist']}")
+                    print(f"Duration: {metadata['duration']:.2f} seconds")
+
+                    if metadata['thumbnail']:
+                          print("Thumbnail loaded successfully.")
+
+                # TODO add metadata to row
+
                 self.all_files.append({
                     'filename': file_path.name,
                     'full_path': str(file_path)

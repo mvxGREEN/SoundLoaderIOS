@@ -29,6 +29,7 @@ requires = [
     "aiohttp",
     "httpx",
     "mutagen",
+    "tinytag",
 ]
 test_requires = [
     "pytest"
