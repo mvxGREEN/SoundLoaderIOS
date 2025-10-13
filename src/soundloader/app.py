@@ -380,7 +380,7 @@ class SoundLoader(toga.App):
             style=Pack(flex=1),
             on_select=self.play_m4a_file
         )
-        self.main_box.add(self.files_table)
+        self.main_box.add(self.file_table)
 
         # preview_box
         self.preview_box = toga.Box(direction=COLUMN)
