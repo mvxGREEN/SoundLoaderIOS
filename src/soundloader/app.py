@@ -26,8 +26,11 @@ from toga.constants import FileDialogAction
 # ios imports
 if sys.platform == 'ios':
     from rubicon.objc import ObjCClass
-    UIPasteboard = ObjCClass('UIPasteboard')
 
+    NSURL = ObjCClass("NSURL")
+    UIPasteboard = ObjCClass('UIPasteboard')
+    AVPlayer = ObjCClass('AVPlayer')
+    AVPlayerItem = ObjCClass('AVPlayerItem')
 
 # global constants
 TWITTER_PLAYER = "twitter:player"
@@ -121,7 +124,6 @@ def delete_directory_recursively(directory_path):
         print(f"An unexpected error occurred while deleting '{directory_path}': {e}")
 
 
-
 # (2A) download playlist
 async def download_m3u_file(url, save_path, filename) -> str:
     """
@@ -170,7 +172,7 @@ def parse_m3u_file(file_path) -> []:
             for line in f:
                 # Remove leading/trailing whitespace and newline characters
                 clean_line = line.strip()
-                
+
                 # add init.mp4 url
                 if "EXT-X-MAP" in clean_line:
                     start = clean_line.find("https")
@@ -271,7 +273,7 @@ class SoundLoader(toga.App):
             data=[]
         )
         self.initial_scan()
-        
+
         # update ui
         self.show_init_layout()
 
@@ -350,10 +352,10 @@ class SoundLoader(toga.App):
                                            on_change=self.input_change,
                                            flex=1,
                                            validators=[StartsWith("https://", error_message="Please paste a valid URL",
-                                                               allow_empty=True),
-                                                    MinLength(15, error_message="Please paste a valid URL",
-                                                              allow_empty=True),
-                                                    ])
+                                                                  allow_empty=True),
+                                                       MinLength(15, error_message="Please paste a valid URL",
+                                                                 allow_empty=True),
+                                                       ])
         self.load_button = toga.Button(
             "Add",
             direction=ROW,
@@ -447,7 +449,7 @@ class SoundLoader(toga.App):
         self.progress.start()
 
     def show_preview_layout(self, filename, thumbnail_url):
-    
+
         # stop progress animation
         self.progress.stop()
         self.progress.visibility = 'hidden'
@@ -549,6 +551,19 @@ class SoundLoader(toga.App):
             # This occurs when the table selection is cleared or if no row is selected
             print("No file selected for playback.")
 
+    def play_audio(self, path):
+        # ios player
+        if hasattr(self, 'player') and sys.platform == "ios":
+            self.player.pause()  # Stop any existing playback
+
+            url = NSURL.fileURLWithPath(str(Path(path)))
+
+            player_item = AVPlayerItem.playerItemWithURL(url)
+            self.player = AVPlayer.playerWithPlayerItem(player_item)
+
+            self.player.play()
+            print(f"playing audio: {path}")
+
     # paste copied text into url_input
     async def paste_action(self):
         print("paste_action")
@@ -607,10 +622,10 @@ class SoundLoader(toga.App):
         Returns:
             The HTML content as a string, or None if an error occurs.
         """
-        
+
         # ⚠️ Suppress the warning that appears when disabling SSL verification
         urllib3.disable_warnings(InsecureRequestWarning)
-        
+
         try:
             # Create an aiohttp ClientSession. It's recommended to use a context manager
             # (the 'async with' block) for the session to ensure resources are properly released.
@@ -642,10 +657,10 @@ class SoundLoader(toga.App):
     # (1B) parse html for player_url
     def extract_player_url(self, html) -> str:
         print(f"extract_player_url: len(html)={len(html)}")
-        
+
         # check for test stream id
         if TEST_STREAM_ID in html:
-        # TODO extract stream id
+            # TODO extract stream id
             print(f"found test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
         else:
             print(f"missing test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
@@ -698,10 +713,10 @@ class SoundLoader(toga.App):
     # (1E) extract filename, thumbnail_url, metadata
     def extract_info(self, html) -> tuple[str, str, str, str]:
         print(f"extract_info: len(html)={len(html)}")
-        
+
         # check for test stream id
         if TEST_STREAM_ID in html:
-        # TODO extract stream id
+            # TODO extract stream id
             print(f"found test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
         else:
             print(f"missing test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
@@ -767,14 +782,14 @@ class SoundLoader(toga.App):
             # get js as string
             js_content = response.text
             print(f"received javascript: js_content{js_content}")
-            
+
             # check for test stream id
             if TEST_STREAM_ID in js_content:
-            # TODO extract stream id
+                # TODO extract stream id
                 print(f"found test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
             else:
                 print(f"missing test stream id: TEST_STREAM_ID={TEST_STREAM_ID}")
-                                
+
             # extract client_id
             if 'client_id=' in js_content:
                 start = js_content.find('client_id=') + 10
@@ -807,7 +822,7 @@ class SoundLoader(toga.App):
                 # get the response content as a string
                 json_string = response.text
                 print(f"received json_string={json_string}")
-                
+
                 # check for test stream id
                 if TEST_STREAM_ID in json_string:
                     # TODO extract stream id
@@ -844,7 +859,7 @@ class SoundLoader(toga.App):
         else:
             print(f"missing playlist_url in json_str={json_str}")
         return playlist_url
-        
+
     # on load click
     async def start_load_audio(self, widget):
         print("load button clicked (start_load_audio)")
@@ -872,7 +887,7 @@ class SoundLoader(toga.App):
         # paste input action
         if not self.search_input.value:
             await self.paste_action()
-            
+
         # validate input
         if "soundcloud.com" not in self.search_input.value:
             self.search_input.value = ""
@@ -1019,7 +1034,7 @@ class SoundLoader(toga.App):
         # download thumbnail
         await download_art(thumbnail_url, self.get_temp_path())
         print(f"finished downloading thumbnail to: str(paths.data)={str(self.get_temp_path())}")
-        
+
         # check for initialization chunk
         file_ext = ".m4s"
         init_chunk_filepath = str(self.get_temp_path()) + "/init.mp4"
@@ -1029,7 +1044,7 @@ class SoundLoader(toga.App):
             await self.show_message_handler("Unknown Error", "Please try again later…")
             print(f"missing init chunk at: init_chunk_filepath={init_chunk_filepath}")
             return
-            
+
         # get chunk paths and destination path
         chunk_paths = [init_chunk_filepath]
         for index, url in enumerate(chunk_urls):
@@ -1037,30 +1052,32 @@ class SoundLoader(toga.App):
                 chunkpath = str(self.get_temp_path()) + "/chunk" + str(index) + file_ext
                 chunk_paths.append(chunkpath)
         dest_filepath = get_dest_path() + track_filename + ".mp4"
-        
+
         # start concatenating
         success = await self.concatenate_m4_segments(chunk_paths, dest_filepath)
         if success:
-            print(f"SUCCESS concat chunk files: str(len(chunk_paths))={str(len(chunk_paths))} dest_filepath={dest_filepath}")
+            print(
+                f"SUCCESS concat chunk files: str(len(chunk_paths))={str(len(chunk_paths))} dest_filepath={dest_filepath}")
         else:
-            print(f"ERROR concat chunk files: str(len(chunk_paths))={str(len(chunk_paths))} dest_filepath={dest_filepath}")
-            
+            print(
+                f"ERROR concat chunk files: str(len(chunk_paths))={str(len(chunk_paths))} dest_filepath={dest_filepath}")
+
         # get thumbnail filepath
         global thumbnail_filename
         thumbnail_filepath = str(self.get_temp_path()) + "/" + thumbnail_filename
         print(f"thumbnail_filepath={thumbnail_filepath}")
-            
+
         # set file tags
         await self.add_tags_to_mp4(dest_filepath, thumbnail_filepath)
         print("finished setting tags")
-            
+
         # delete temp files
         delete_directory_recursively(self.get_temp_path())
-        
+
         # update ui
         await self.show_finished_layout()
         print("finished showing finished layout!")
-            
+
     async def concatenate_m4_segments(self, file_list, output_path) -> bool:
         """
         Concatenates a list of .m4s or .mp4 segments into a single fragmented MP4 audio (m4a) file.
@@ -1072,7 +1089,7 @@ class SoundLoader(toga.App):
         if not file_list:
             print("Error: File list is empty.")
             return False
-        
+
         try:
             with open(output_path, 'wb') as outfile:
                 for filepath in file_list:
@@ -1081,17 +1098,17 @@ class SoundLoader(toga.App):
                         content = infile.read()
                         # Write it to the final output file
                         outfile.write(content)
-            
+
             print(f"Successfully concatenated files to: {output_path}")
             return True
-        
+
         except FileNotFoundError as e:
             print(f"Error: One of the files was not found: {e}")
             return False
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             return False
-            
+
     async def add_tags_to_mp4(self, audio_file_path, image_file_path):
         """
         Adds album art to an MP4 audio file using the Mutagen library.
@@ -1100,10 +1117,10 @@ class SoundLoader(toga.App):
         :param image_file_path: Full path to the JPEG or PNG image file.
         """
         print("add_tags_to_mp4 audio_file_path={audio_file_path} image_file_path={image_file_path}")
-        
+
         global track_title
         global track_artist
-        
+
         try:
             # 1. Load the MP4 file
             audio = MP4(audio_file_path)
@@ -1130,7 +1147,7 @@ class SoundLoader(toga.App):
             # 5. Add the cover art to the tags
             # The key for cover art in MP4 tags is 'covr'
             audio['covr'] = [cover]
-            
+
             # You can add other tags here if needed (e.g., '©nam' for Title)
             audio['©nam'] = [track_title]
             audio['©ART'] = [track_artist]
@@ -1138,7 +1155,6 @@ class SoundLoader(toga.App):
             # audio['aArt'] = [album_artist]
             # audio['©day'] = [track_year]
             # audio['©gen'] = [track_genre]
-            
 
             # 6. Save the changes to the file
             audio.save()
@@ -1148,7 +1164,7 @@ class SoundLoader(toga.App):
             print("Error: Audio or image file not found.")
         except Exception as e:
             print(f"An error occurred: {e}")
-        
+
     async def show_message_handler(self, title, message):
         # create the InfoDialog instance
         dialog = toga.InfoDialog(
