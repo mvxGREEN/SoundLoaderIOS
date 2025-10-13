@@ -27,12 +27,14 @@ from toga.sources import ListSource, Row
 # ios imports
 if sys.platform == 'ios':
     from rubicon.objc import ObjCClass
-
     NSURL = ObjCClass("NSURL")
     UIPasteboard = ObjCClass('UIPasteboard')
     AVPlayer = ObjCClass('AVPlayer')
     AVPlayerItem = ObjCClass('AVPlayerItem')
-
+    AVAudioSession = ObjCClass('AVAudioSession')
+    AVAudioSessionCategoryPlayback = 'AVAudioSessionCategoryPlayback'
+    NATIVE_AUDIO_SUPPORT = True
+    
 # global constants
 TWITTER_PLAYER = "twitter:player"
 TWITTER_TITLE = "twitter:title"
@@ -56,6 +58,24 @@ thumbnail_filename = ""
 thumbnail_url = ""
 track_title = ""
 track_artist = ""
+_audio_thumbnail_image = None
+
+
+# TODO load a file from self.app.paths.app using toga.Image.
+def get_thumbnail_placeholder():
+    global _audio_thumbnail_image
+    if _audio_thumbnail_image is None:
+        try:
+            # Assuming the image is saved as 'audio_thumbnail.png' in your app's resources
+            # The path here is relative to your app's base directory when running with BeeWare/Briefcase.
+            # You might need to adjust the path based on your project structure.
+            _audio_thumbnail_image = toga.Image("resources/placeholder_trans_grey.png")
+        except Exception as e:
+            print(f"Error loading thumbnail image: {e}")
+            # Fallback if image loading fails
+            _audio_thumbnail_image = None # Or provide a default blank image
+
+    return _audio_thumbnail_image
 
 
 def get_m4a_metadata(file_path):
@@ -320,7 +340,29 @@ class SoundLoader(toga.App):
 
         # init ui
         self.show_init_layout()
-
+        
+        # create player, audio session, and related fields
+        self.player = None
+        self.current_playing_path = None # Path of the file currently playing/paused
+        self.button_map = {} # Maps file path (str) to the Toga Button widget (for icon updates)
+        
+        if NATIVE_AUDIO_SUPPORT:
+            try:
+                session = AVAudioSession.sharedInstance()
+                
+                # 1. Set the audio category to Playback (ensures audio comes out of speakers/headphones)
+                # We ignore the error pointer for simplicity in Python code.
+                session.setCategory(AVAudioSessionCategoryPlayback, error=None)
+                
+                # 2. Activate the session
+                session.setActive(True, error=None)
+                print("AVAudioSession set to Playback and activated.")
+                    
+            except Exception as e:
+                # This should log an error if configuration fails but prevent app crash
+                print(f"Error configuring AVAudioSession: {e}")
+                
+        
         # run initial scan
         self.initial_scan()
 
@@ -361,11 +403,13 @@ class SoundLoader(toga.App):
                     if metadata['thumbnail']:
                           print("Thumbnail loaded successfully.")
 
-                # TODO add metadata to row
-
                 self.all_files.append({
                     'filename': file_path.name,
-                    'full_path': str(file_path)
+                    'full_path': str(file_path),
+                    'title': metadata['title'],
+                    'artist': metadata['artist'],
+                    'duration': metadata['duration'],
+                    'thumbnail': metadata['thumbnail']
                 })
 
         print(f"Total files found: {len(self.all_files)}")
@@ -377,30 +421,68 @@ class SoundLoader(toga.App):
         # after initial scan, apply the current filter (which might be empty)
         self.filter_files(self.search_input)
         
+    # You'll need to add a duration key to your file data dictionaries
+    # in initial_scan for this to work (or hardcode it for testing).
     def create_file_row(self, file_data):
-        """Creates one detailed row (Box) for a file entry."""
+        """Creates a detailed file row: [Thumbnail] [Title/Subtitle] [Play Button]"""
+        
         filename = file_data['filename']
+        duration = file_data.get('duration', "Unknown duration")
         full_path = file_data['full_path']
         
-        # 1. Label for the file name
-        name_label = toga.Label(filename, style=Pack(flex=1, font_weight='bold'))
-        
-        # 2. Playback Button
-        play_button = toga.Button(
-            '▶ Play',
-            style=Pack(width=70, padding_left=10),
-            # Use a lambda to pass the file path to the playback method
-            on_press=lambda widget, path=full_path: self.play_audio(path)
+        # thumbnail
+        thumbnail_image = get_thumbnail_placeholder()
+        if thumbnail_image:
+            thumbnail_view = toga.ImageView(
+                image=thumbnail_image,
+                style=Pack(width=40, height=40, padding_right=10)
+            )
+        else:
+            # Fallback if image couldn't be loaded
+            thumbnail_view = toga.Box(style=Pack(width=40, height=40, background_color='#CCC', padding_right=10))
+
+        # trim display title to 25 characters
+        display_title = filename
+        if len(display_title) > 20:
+            display_title = display_title[:20]
+            
+        title_label = toga.Label(
+            display_title,
+            style=Pack(text_align='left')
         )
         
-        # 3. Create the row Box
+        # subtitle (duration)
+        subtitle_label = toga.Label(
+            duration,
+            style=Pack(font_size=10, color='gray', text_align='left')
+        )
+        
+        # stack the title and subtitle vertically
+        text_container = toga.Box(
+            children=[title_label, subtitle_label],
+            style=Pack(direction=COLUMN, flex=1) # flex=1 ensures it takes available width
+        )
+        
+        initial_icon = '▶'
+        if self.current_playing_path == full_path and self.player and self.player.rate > 0:
+             initial_icon = '⏸'
+             
+        play_button = toga.Button(
+            initial_icon,
+            style=Pack(width=40, height=40, padding=0, color='black', font_weight='bold'),
+            # updated handler to pass the button widget and the file path
+            on_press=lambda widget, path=full_path: self.toggle_playback(path, widget)
+        )
+        
+        # store button reference for state management (used when stopping previous playback)
+        self.button_map[full_path] = play_button
+        
         row_box = toga.Box(
-            children=[name_label, play_button],
+            children=[thumbnail_view, text_container, play_button],
             style=Pack(
                 direction=ROW,
+                alignment=CENTER, # vertically centers all children
                 padding=10,
-                flex=1 # Allows the row to fill the width of the parent
-                # Add a separator line for visual distinction
                 # border_bottom_color='#DDD',
                 # border_bottom_width=1
             )
@@ -468,18 +550,6 @@ class SoundLoader(toga.App):
         self.url_box.add(self.search_input)
         self.url_box.add(self.load_button)
         self.main_box.add(self.url_box)
-
-        # files box
-        #self.file_table = toga.Table(
-        #    headings=['File Name', 'File Path'],
-        #    data=self.all_files,
-        #    accessors=['filename', 'full_path'],
-        #    style=Pack(flex=1),
-        #    on_select=self.play_m4a_file
-        #)
-        # self.file_table_box = toga.Box(children=[self.file_table], direction=COLUMN)
-        # self.main_box.add(self.file_table_box)
-        # print(f"table data: {str(self.file_table.data)}")
         
         # container to hold all the file boxes
         self.file_list_box = toga.Box(
@@ -492,6 +562,18 @@ class SoundLoader(toga.App):
             style=Pack(flex=1)
         )
         self.main_box.add(self.scroll_container)
+        
+        # main_window
+        self.main_window = toga.MainWindow(title="SoundLoader")
+        self.main_window.content = self.main_box
+        self.main_window.show()
+
+    def show_loading_layout(self):
+        # set load_button to loading
+        self.load_button.text = "Loading…"
+
+        # set download_button to download
+        self.download_button.text = "Download"
         
         # preview_box
         self.preview_box = toga.Box(direction=COLUMN)
@@ -532,19 +614,6 @@ class SoundLoader(toga.App):
         self.filename_input_label.style.visibility = 'hidden'
         self.filename_input.style.visibility = 'hidden'
         self.download_button.style.visibility = 'hidden'
-
-        # main_window
-        self.main_window = toga.MainWindow(title="SoundLoader")
-        self.main_window.content = self.main_box
-        self.main_window.show()
-
-    def show_loading_layout(self):
-        # set load_button to loading
-        self.load_button.text = "Loading…"
-
-        # set download_button to download
-        self.download_button.text = "Download"
-
         # disable clickable widgets
         self.search_input.enabled = False
         self.filename_input.enabled = False
@@ -613,6 +682,10 @@ class SoundLoader(toga.App):
     async def show_finished_layout(self):
         # set download_button to finished
         self.download_button.text = "Finished!"
+        
+        # TODO remove downloader boxes and widgets
+        
+        # TODO add new file to list
 
         # stop progress bar
         self.progress.stop()
@@ -651,20 +724,66 @@ class SoundLoader(toga.App):
             self.load_button.text = "Clear"
             self.filter_files(self.search_input)
 
-    def play_audio(self, path):
-        # ios player
-        if hasattr(self, 'player') and sys.platform == "ios":
-            self.player.pause()  # Stop any existing playback
+    def toggle_playback(self, path, button):
+        """
+        Toggles M4A audio playback (Play/Pause/Stop) using AVFoundation.
+        
+        :param path: The absolute file path (string) to the M4A file.
+        :param button: The Toga Button widget that was pressed.
+        """
+        if not NATIVE_AUDIO_SUPPORT:
+            print("ERROR: Native AVFoundation audio support is unavailable on this platform.")
+            self.main_window.info_dialog("Audio Error", "Native AVPlayer is not accessible.")
+            return
 
-            url = NSURL.fileURLWithPath(str(Path(path)))
+        try:
+            audio_path = str(Path(path).absolute())
+            
+            # --- Case 1: Same file is currently playing or paused ---
+            if self.current_playing_path == audio_path and self.player:
+                
+                # Check if playing (rate > 0.0)
+                if self.player.rate > 0.0:
+                    # PAUSE
+                    self.player.pause()
+                    button.text = '▶' # Change icon to Play
+                    print(f"AVFoundation: Paused playback for: {audio_path}")
+                else:
+                    # RESUME
+                    self.player.play()
+                    button.text = '⏸' # Change icon to Pause
+                    print(f"AVFoundation: Resumed playback for: {audio_path}")
+                
+            # --- Case 2: New file selected OR no file playing ---
+            else:
+                # 1. Stop old playback and reset its button icon if necessary
+                if self.current_playing_path and self.button_map.get(self.current_playing_path):
+                    old_button = self.button_map[self.current_playing_path]
+                    old_button.text = '▶'
+                
+                # 2. Stop old player
+                if self.player:
+                    self.player.pause()
+                    self.player = None
 
-            player_item = AVPlayerItem.playerItemWithURL(url)
-            self.player = AVPlayer.playerWithPlayerItem(player_item)
+                # 3. Start new playback
+                url = NSURL.fileURLWithPath(audio_path)
+                player_item = AVPlayerItem.playerItemWithURL(url)
+                self.player = AVPlayer.playerWithPlayerItem(player_item)
+                
+                self.player.play()
+                
+                # 4. Update state and current button icon
+                self.current_playing_path = audio_path
+                button.text = '⏸' # Change icon to Pause
+                print(f"AVFoundation: Started new playback for: {audio_path}")
 
-            self.player.play()
-            print(f"playing audio: {path}")
-        else:
-            print("playback not implemented for this os!")
+        except Exception as e:
+            print(f"AVFoundation Playback Error: {e}")
+            self.main_window.error_dialog(
+                "Playback Failure",
+                f"Failed to play '{Path(path).name}'. Error: {e}"
+            )
 
     # paste copied text into url_input
     async def paste_action(self):
@@ -698,9 +817,25 @@ class SoundLoader(toga.App):
         # self.all_files = []
         for file_path in file_paths:
             if file_path.is_file():
+            
+                # get metadata
+                metadata = get_m4a_metadata(str(file_path))
+
+                if metadata:
+                    print(f"Title: {metadata['title']}")
+                    print(f"Artist: {metadata['artist']}")
+                    print(f"Duration: {metadata['duration']:.2f} seconds")
+
+                    if metadata['thumbnail']:
+                          print("Thumbnail loaded successfully.")
+            
                 self.all_files.append({
                     'filename': file_path.name,
-                    'full_path': str(file_path)
+                    'full_path': str(file_path),
+                    'title': metadata['title'],
+                    'artist': metadata['artist'],
+                    'duration': metadata['duration'],
+                    'thumbnail': metadata['thumbnail']
                 })
 
         print(f"total files: {len(self.all_files)}")
