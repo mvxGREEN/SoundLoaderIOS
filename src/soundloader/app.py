@@ -590,9 +590,8 @@ class SoundLoader(toga.App):
         print("clear_action")
         self.search_input.value = ""
 
-    async def handle_file_pick(self, file_paths_1, file_paths_2):
-        print(f"handle_file_paths: len(file_paths_1)={len(file_paths_1)}")
-        print(f"handle_file_paths: len(file_paths_2)={len(file_paths_2)}")
+    async def handle_file_pick(self, window, file_paths):
+        print(f"handle_file_paths: len(file_paths)={len(file_paths)}")
 
         # TODO add files at file paths to listsource & update ui
 
