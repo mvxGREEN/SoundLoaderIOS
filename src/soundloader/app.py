@@ -598,7 +598,7 @@ class SoundLoader(toga.App):
         print(f"scanned files: {len(file_paths)}")
 
         # 1. Collect all .m4a files into the master list
-        self.all_files = []
+        # self.all_files = []
         for file_path in file_paths:
             if file_path.is_file():
                 self.all_files.append({
