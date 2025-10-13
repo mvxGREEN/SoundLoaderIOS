@@ -38,7 +38,7 @@ The app accepts a Soundcloud URL (track only) and downloads the track as an .MP4
   * aiohttp
   * httpx
   * mutagen
-* beeware virtual environment
+* [beeware virtual environment](https://docs.beeware.org/en/latest/tutorial/tutorial-0.html)
 
 ## How To Build Xcode Project
 
