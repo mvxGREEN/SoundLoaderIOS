@@ -376,30 +376,63 @@ class SoundLoader(toga.App):
 
         # after initial scan, apply the current filter (which might be empty)
         self.filter_files(self.search_input)
-
+        
+    def create_file_row(self, file_data):
+        """Creates one detailed row (Box) for a file entry."""
+        filename = file_data['filename']
+        full_path = file_data['full_path']
+        
+        # 1. Label for the file name
+        name_label = toga.Label(filename, style=Pack(flex=1, font_weight='bold'))
+        
+        # 2. Playback Button
+        play_button = toga.Button(
+            '▶ Play',
+            style=Pack(width=70, padding_left=10),
+            # Use a lambda to pass the file path to the playback method
+            on_press=lambda widget, path=full_path: self.play_audio(path)
+        )
+        
+        # 3. Create the row Box
+        row_box = toga.Box(
+            children=[name_label, play_button],
+            style=Pack(
+                direction=ROW,
+                padding=10,
+                flex=1 # Allows the row to fill the width of the parent
+                # Add a separator line for visual distinction
+                # border_bottom_color='#DDD',
+                # border_bottom_width=1
+            )
+        )
+        return row_box
+        
     def filter_files(self, text_input):
-        """Filters the master list based on the TextInput value and updates the ListSource."""
-
-        # Get the current search term, convert to lowercase for case-insensitive search
+        """Filters the master list based on the TextInput value and redraws the UI."""
+        
         search_term = text_input.value.lower()
-
-        # If the search term is empty, show all files
+        
         if not search_term:
-            print("not filtering files")
             filtered_data = self.all_files
         else:
-            print("filtering files")
-            # 3. Filter the master list
             filtered_data = [
                 file_info
                 for file_info in self.all_files
-                # Check if the file name contains the search term
                 if search_term in file_info['filename'].lower()
             ]
 
-        # 4. Update the ListSource (this refreshes the Toga Table)
-        print(f"filtered_data={filtered_data}")
-        self.file_table.data = filtered_data
+        # ⭐️ CORE FIX: Clear the old contents
+        self.file_list_box.clear()
+
+        # ⭐️ Populate the box with new, filtered rows
+        for file_data in filtered_data:
+            row = self.create_file_row(file_data)
+            self.file_list_box.add(row)
+
+        print(f"List refreshed. Showing {len(filtered_data)} files.")
+        
+        # The ScrollContainer/Box pattern does not require the .notify() call
+        # because you are directly manipulating the widget hierarchy.
 
     def show_init_layout(self):
         # main_box
@@ -437,18 +470,29 @@ class SoundLoader(toga.App):
         self.main_box.add(self.url_box)
 
         # files box
-        self.file_table = toga.Table(
-            headings=['File Name', 'File Path'],
-            data=self.all_files,
-            accessors=['filename', 'full_path'],
-            style=Pack(flex=1),
-            on_select=self.play_m4a_file
+        #self.file_table = toga.Table(
+        #    headings=['File Name', 'File Path'],
+        #    data=self.all_files,
+        #    accessors=['filename', 'full_path'],
+        #    style=Pack(flex=1),
+        #    on_select=self.play_m4a_file
+        #)
+        # self.file_table_box = toga.Box(children=[self.file_table], direction=COLUMN)
+        # self.main_box.add(self.file_table_box)
+        # print(f"table data: {str(self.file_table.data)}")
+        
+        # container to hold all the file boxes
+        self.file_list_box = toga.Box(
+            style=Pack(direction=COLUMN, padding=0),
         )
-        self.file_table_box = toga.Box(children=[self.file_table], direction=COLUMN)
-        self.main_box.add(self.file_table_box)
 
-        print(f"table data: {str(self.file_table.data)}")
-
+        # scrollable area for the list
+        self.scroll_container = toga.ScrollContainer(
+            content=self.file_list_box,
+            style=Pack(flex=1)
+        )
+        self.main_box.add(self.scroll_container)
+        
         # preview_box
         self.preview_box = toga.Box(direction=COLUMN)
         self.main_box.add(self.preview_box)
@@ -607,30 +651,6 @@ class SoundLoader(toga.App):
             self.load_button.text = "Clear"
             self.filter_files(self.search_input)
 
-    def play_m4a_file(self, table):
-        print("play_m4a_file")
-        """
-        Handles the row selection and initiates playback.
-        The 'row' object is the data item from the ListSource that was clicked.
-        """
-        selected_row = table.selection
-
-        if isinstance(selected_row, list):
-            # This handles multi-selection if enabled, but we assume single-select here.
-            row_data = selected_row[0]
-        else:
-            row_data = selected_row
-
-        if row_data:
-            # The 'row' is the dictionary/object used to populate the ListSource.
-            # We access the 'full_path' we stored earlier.
-            file_path = row_data.full_path
-            print(f"playing file at file_path: {file_path}")
-            self.play_audio(file_path)
-        else:
-            # This occurs when the table selection is cleared or if no row is selected
-            print("No file selected for playback.")
-
     def play_audio(self, path):
         # ios player
         if hasattr(self, 'player') and sys.platform == "ios":
@@ -690,7 +710,7 @@ class SoundLoader(toga.App):
 
     async def pick_file_action(self):
         # init scan
-        self.initial_scan()
+        #self.initial_scan()
 
         try:
             # Use the platform-native file picker to select a file
