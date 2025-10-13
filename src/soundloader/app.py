@@ -10,19 +10,17 @@ from aiohttp import ClientConnectorError
 import httpx
 import shutil
 import re
-import random
 import sys
 import os
 import requests
-from requests.exceptions import SSLError
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
-import json
 from io import BytesIO
 from toga.style import Pack
 from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 from mutagen.mp4 import MP4, MP4Cover
+from toga.sources import ListSource
 
 # ios imports
 if sys.platform == 'ios':
@@ -251,12 +249,18 @@ async def download_art(url: str, save_path: Path) -> str:
 
 
 class SoundLoader(toga.App):
+    file_list_data = []
+    storage_dir = Path(get_dest_path())
+
     # startup
     def startup(self):
         # register fonts
         toga.Font.register("FiraSans", "resources/FiraSans-Regular.ttf")
         toga.Font.register("FiraSansExtraLight", "resources/FiraSans-ExtraLight.ttf")
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
+
+        # scan files
+        self.startup_scan()
         
         # update ui
         self.show_init_layout()
@@ -278,6 +282,73 @@ class SoundLoader(toga.App):
             print(f"Directory '{docs_path}' already exists.")
         except FileNotFoundError:
             print(f"Parent directory for '{docs_path}' does not exist.")
+
+    def startup_scan(self):
+        print('start startup_scan')
+        # 1. Determine the Accessible Storage Path
+        # The 'data' path is a standard location for user-generated content/downloads in the app's sandbox.
+        self.storage_dir: Path = self.paths.data  # get_dest_dir()
+
+        # Ensure the directory exists (good practice, especially for writable paths)
+        if not self.storage_dir.exists():
+            self.storage_dir.mkdir(parents=True)
+
+        # 2. Prepare the List Source for the Table
+        # We'll use a Toga ListSource to manage the data displayed in the table.
+        self.file_list_data = ListSource(
+            accessors=['filename', 'full_path'],
+            data=[]
+        )
+
+        # 3. Create the Toga Table
+        self.file_table = toga.Table(
+            headings=["File Name"],
+            data=self.file_list_data,
+            # We hide the 'full_path' column but keep it in the data source for later use.
+            accessors=['filename'],
+            style=Pack(flex=1)
+        )
+
+        # Create a button to trigger the scan (useful for testing/updating)
+        scan_button = toga.Button(
+            'Scan for .m4a Files',
+            on_press=self.scan_files,
+            style=Pack(padding=10)
+        )
+
+        # Set up the files box layout
+        files_box = toga.Box(
+            children=[scan_button, self.file_table],
+            style=Pack(direction=COLUMN)
+        )
+
+        self.main_window = toga.MainWindow(title=self.formal_name)
+        self.main_window.content = main_box
+        self.main_window.show()
+
+        # Initial scan on startup
+        self.scan_files(None)
+
+    # 2. The Scanning Logic
+    def scan_files(self, widget):
+        """Scans the app's data directory for .m4a files and updates the table."""
+        print(f"Scanning directory: {self.storage_dir}")
+        m4a_files = []
+
+        # pathlib's .glob() or .rglob() is great for file pattern matching.
+        # .rglob('*.m4a') recursively searches for all .m4a files in subdirectories too.
+        for file_path in self.storage_dir.rglob('*.m4a'):
+            # Filter out directories that might match the pattern (though unlikely with *.m4a)
+            if file_path.is_file():
+                # We store both the simple file name and the full path
+                m4a_files.append({
+                    'filename': file_path.name,
+                    'full_path': str(file_path)
+                })
+
+        # Update the ListSource data
+        self.file_list_data.data = m4a_files
+        print(f"Found {len(m4a_files)} .m4a files.")
 
     def show_init_layout(self):
         # main_box
