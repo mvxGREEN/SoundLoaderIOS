@@ -19,9 +19,9 @@ The app accepts a Soundcloud URL (track only) and downloads the track as an .MP4
 
 ## Screenshots
 
-<img width="1284" height="2778" alt="Apple iPhone 16 Pro Max Screenshot 1" src="https://github.com/user-attachments/assets/355a98ef-5c96-446d-9b1b-e16e837bab9b" />
-<img width="1284" height="2778" alt="Apple iPhone 16 Pro Max Screenshot 2" src="https://github.com/user-attachments/assets/e463bfb3-b7e0-4dba-8c1e-a00d83b6c4ca" />
-<img width="1284" height="2778" alt="Apple iPhone 16 Pro Max Screenshot 3" src="https://github.com/user-attachments/assets/d466dd7c-af13-4c3a-aac3-5a94b344f438" />
+<img width="405" height="720" alt="Apple iPhone 16 Pro Max Screenshot 1" src="https://github.com/user-attachments/assets/355a98ef-5c96-446d-9b1b-e16e837bab9b" />
+<img width="405" height="720" alt="Apple iPhone 16 Pro Max Screenshot 2" src="https://github.com/user-attachments/assets/e463bfb3-b7e0-4dba-8c1e-a00d83b6c4ca" />
+<img width="405" height="720" alt="Apple iPhone 16 Pro Max Screenshot 3" src="https://github.com/user-attachments/assets/d466dd7c-af13-4c3a-aac3-5a94b344f438" />
 
 ## Requires
 
