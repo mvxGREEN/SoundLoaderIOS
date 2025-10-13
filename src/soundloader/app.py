@@ -251,10 +251,6 @@ async def download_art(url: str, save_path: Path) -> str:
 
 
 class SoundLoader(toga.App):
-    all_files = []
-    file_list_data = []
-
-    # startup
     def startup(self):
         # register fonts
         toga.Font.register("FiraSans", "resources/FiraSans-Regular.ttf")
