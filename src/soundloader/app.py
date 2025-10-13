@@ -250,9 +250,6 @@ async def download_art(url: str, save_path: Path) -> str:
 
 
 class SoundLoader(toga.App):
-    file_list_data = []
-    storage_dir = Path(get_dest_path())
-
     # startup
     def startup(self):
         # register fonts
@@ -261,7 +258,19 @@ class SoundLoader(toga.App):
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
 
         # scan files
-        self.startup_scan()
+        self.storage_dir: Path = self.paths.data
+        if not self.storage_dir.exists():
+            self.storage_dir.mkdir(parents=True)
+
+        # ⭐️ 1. Store the full list of files (the master data)
+        self.all_files = []
+
+        # 2. The ListSource will hold the filtered/visible data
+        self.file_list_data = ListSource(
+            accessors=['filename', 'full_path'],
+            data=[]
+        )
+        self.initial_scan()
         
         # update ui
         self.show_init_layout()
@@ -284,72 +293,43 @@ class SoundLoader(toga.App):
         except FileNotFoundError:
             print(f"Parent directory for '{docs_path}' does not exist.")
 
-    def startup_scan(self):
-        print('start startup_scan')
-        # 1. Determine the Accessible Storage Path
-        # The 'data' path is a standard location for user-generated content/downloads in the app's sandbox.
-        self.storage_dir: Path = self.paths.data  # get_dest_dir()
+    def initial_scan(self):
+        """Scans the directory and populates the master list."""
 
-        # Ensure the directory exists (good practice, especially for writable paths)
-        if not self.storage_dir.exists():
-            self.storage_dir.mkdir(parents=True)
-
-        # 2. Prepare the List Source for the Table
-        # We'll use a Toga ListSource to manage the data displayed in the table.
-        self.file_list_data = ListSource(
-            accessors=['filename', 'full_path'],
-            data=[]
-        )
-
-        # 3. Create the Toga Table
-        self.file_table = toga.Table(
-            headings=["File Name"],
-            data=self.file_list_data,
-            # We hide the 'full_path' column but keep it in the data source for later use.
-            accessors=['filename'],
-            style=Pack(flex=1)
-        )
-
-        # Create a button to trigger the scan (useful for testing/updating)
-        scan_button = toga.Button(
-            'Scan for .m4a Files',
-            on_press=self.scan_files,
-            style=Pack(padding=10)
-        )
-
-        # Set up the files box layout
-        files_box = toga.Box(
-            children=[scan_button, self.file_table],
-            style=Pack(direction=COLUMN)
-        )
-
-        self.main_window = toga.MainWindow(title=self.formal_name)
-        self.main_window.content = main_box
-        self.main_window.show()
-
-        # Initial scan on startup
-        self.scan_files(None)
-
-    # 2. The Scanning Logic
-    def scan_files(self, widget):
-        """Scans the app's data directory for .m4a files and updates the table."""
-        print(f"Scanning directory: {self.storage_dir}")
-        m4a_files = []
-
-        # pathlib's .glob() or .rglob() is great for file pattern matching.
-        # .rglob('*.m4a') recursively searches for all .m4a files in subdirectories too.
+        # 1. Collect all .m4a files into the master list
+        self.all_files = []
         for file_path in self.storage_dir.rglob('*.m4a'):
-            # Filter out directories that might match the pattern (though unlikely with *.m4a)
             if file_path.is_file():
-                # We store both the simple file name and the full path
-                m4a_files.append({
+                self.all_files.append({
                     'filename': file_path.name,
                     'full_path': str(file_path)
                 })
 
-        # Update the ListSource data
-        self.file_list_data.data = m4a_files
-        print(f"Found {len(m4a_files)} .m4a files.")
+        print(f"Total files found: {len(self.all_files)}")
+
+        # 2. After a new scan, apply the current filter (which might be empty)
+        self.filter_files(self.search_input)
+
+    def filter_files(self, text_input):
+        """Filters the master list based on the TextInput value and updates the ListSource."""
+
+        # Get the current search term, convert to lowercase for case-insensitive search
+        search_term = text_input.value.lower()
+
+        # If the search term is empty, show all files
+        if not search_term:
+            filtered_data = self.all_files
+        else:
+            # 3. Filter the master list
+            filtered_data = [
+                file_info
+                for file_info in self.all_files
+                # Check if the file name contains the search term
+                if search_term in file_info['filename'].lower()
+            ]
+
+        # 4. Update the ListSource (this refreshes the Toga Table)
+        self.file_list_data.data = filtered_data
 
     def show_init_layout(self):
         # main_box
@@ -365,11 +345,11 @@ class SoundLoader(toga.App):
         self.main_box.add(self.hint_box)
 
         # url_box
-        self.url_input = toga.TextInput(direction=ROW,
-                                        on_confirm=self.start_load_audio,
-                                        on_change=self.input_change,
-                                        flex=1,
-                                        validators=[StartsWith("https://", error_message="Please paste a valid URL",
+        self.search_input = toga.TextInput(direction=ROW,
+                                           on_confirm=self.start_load_audio,
+                                           on_change=self.input_change,
+                                           flex=1,
+                                           validators=[StartsWith("https://", error_message="Please paste a valid URL",
                                                                allow_empty=True),
                                                     MinLength(15, error_message="Please paste a valid URL",
                                                               allow_empty=True),
@@ -382,7 +362,7 @@ class SoundLoader(toga.App):
         )
         self.load_button.style.visibility = 'visible'
         self.url_box = toga.Box(margin=(0, 8))
-        self.url_box.add(self.url_input)
+        self.url_box.add(self.search_input)
         self.url_box.add(self.load_button)
         self.main_box.add(self.url_box)
 
@@ -439,7 +419,7 @@ class SoundLoader(toga.App):
         self.download_button.text = "Download"
 
         # disable clickable widgets
-        self.url_input.enabled = False
+        self.search_input.enabled = False
         self.filename_input.enabled = False
         self.load_button.enabled = False
         self.download_button.enabled = False
@@ -475,7 +455,7 @@ class SoundLoader(toga.App):
             self.load_button.text = "Clear"
 
             # enable clickable widgets
-            self.url_input.enabled = True
+            self.search_input.enabled = True
             self.filename_input.enabled = True
             self.load_button.enabled = True
             self.download_button.enabled = True
@@ -496,7 +476,7 @@ class SoundLoader(toga.App):
         # disable clickable widgets
         self.load_button.enabled = False
         self.download_button.enabled = False
-        self.url_input.enabled = False
+        self.search_input.enabled = False
         self.filename_input.enabled = False
 
         # start progress animation
@@ -514,12 +494,12 @@ class SoundLoader(toga.App):
         self.progress.visibility = 'hidden'
 
         # enable (some) clickable widgets
-        self.url_input.enabled = True
+        self.search_input.enabled = True
         self.load_button.enabled = True
 
     # listen for textual changes to url_input
     def input_change(self, widget):
-        if self.url_input.value == "":
+        if self.search_input.value == "":
             print("url_input cleared")
 
             # reset main button
@@ -536,12 +516,13 @@ class SoundLoader(toga.App):
             self.filename_input_label.style.visibility = 'hidden'
             self.filename_input.style.visibility = 'hidden'
             self.download_button.style.visibility = 'hidden'
-        elif "https://" in self.url_input.value and self.url_input.value.count("/") >= 3:
+        elif "https://" in self.search_input.value and self.search_input.value.count("/") >= 3:
             # set load_button to load
             self.load_button.text = "Load"
         else:
             # set load_button to clear
             self.load_button.text = "Clear"
+            self.filter_files(self.search_input)
 
     # paste copied text into url_input
     async def paste_action(self):
@@ -556,7 +537,7 @@ class SoundLoader(toga.App):
 
             # check if there is any text to paste
             if not str(pasted_text) is None:
-                self.url_input.value = pasted_text
+                self.search_input.value = pasted_text
             else:
                 print("no text copied!")
                 await self.show_message_handler("Invalid Input", "Please copy a valid URL…\nEx. https://on.sound…")
@@ -566,7 +547,7 @@ class SoundLoader(toga.App):
     # clear text from url_input
     def clear_action(self):
         print("clear_action")
-        self.url_input.value = ""
+        self.search_input.value = ""
 
     async def pick_file_action(self):
         try:
@@ -864,12 +845,12 @@ class SoundLoader(toga.App):
             return
 
         # paste input action
-        if not self.url_input.value:
+        if not self.search_input.value:
             await self.paste_action()
             
         # validate input
-        if "soundcloud.com" not in self.url_input.value:
-            self.url_input.value = ""
+        if "soundcloud.com" not in self.search_input.value:
+            self.search_input.value = ""
             await self.show_message_handler("Invalid Input", "Please copy a valid URL…\nEx. https://on.sound…")
         # validate input
         else:
@@ -877,7 +858,7 @@ class SoundLoader(toga.App):
             self.show_loading_layout()
 
             # await player_url
-            input_url = self.url_input.value
+            input_url = self.search_input.value
             html = await self.get_html_from(input_url)
             print(f"finished get_html_from: html={html}")
 
@@ -972,7 +953,7 @@ class SoundLoader(toga.App):
 
         # start downloading audio
         dl_a_task = asyncio.create_task(
-            self.download_audio(f"{self.url_input.value}",
+            self.download_audio(f"{self.search_input.value}",
                                 get_dest_path(),
                                 f"{self.filename_input.value}"))
         await dl_a_task
