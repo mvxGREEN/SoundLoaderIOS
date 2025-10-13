@@ -21,6 +21,7 @@ from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 from mutagen.mp4 import MP4, MP4Cover
 from toga.sources import ListSource
+from toga.constants import FileDialogAction
 
 # ios imports
 if sys.platform == 'ios':
@@ -356,7 +357,7 @@ class SoundLoader(toga.App):
 
         # hint_box
         hint_label = toga.Label(
-            "Paste URL:",
+            "My Music:",
             font_family="FiraSans",
             margin=(8, 8, 4, 8),
         )
@@ -374,7 +375,7 @@ class SoundLoader(toga.App):
                                                               allow_empty=True),
                                                     ])
         self.load_button = toga.Button(
-            "Paste",
+            "Add",
             direction=ROW,
             on_press=self.start_load_audio,
             margin=(0, 0, 0, 4),
@@ -521,8 +522,8 @@ class SoundLoader(toga.App):
         if self.url_input.value == "":
             print("url_input cleared")
 
-            # set load_button to paste
-            self.load_button.text = "Paste"
+            # reset main button
+            self.load_button.text = "Add"
 
             # reset progress
             self.progress.value = 0
@@ -566,6 +567,28 @@ class SoundLoader(toga.App):
     def clear_action(self):
         print("clear_action")
         self.url_input.value = ""
+
+    async def pick_file_action(self):
+        try:
+            # Use the platform-native file picker to select a file
+            selected_file = await self.main_window.show_open_dialog(
+                title="Select M4A File",
+                # iOS-specific file types are handled by the Toga backend
+                file_types=['m4a', 'm4b'],
+                multiselect=True
+            )
+
+            if selected_file:
+                # The 'selected_file' will be a list of pathlib.Path objects
+                # You would then process these files, perhaps copying them
+                # into your app's 'data' directory for continued access.
+                print(f"User selected files: {selected_file}")
+                # ... logic to copy and add to the ListSource ...
+            else:
+                print("No file selected.")
+
+        except Exception as e:
+            print(f"Error during file selection: {e}")
 
     # (1A) get html from url as string
     async def get_html_from(self, url: str) -> str:
@@ -830,12 +853,17 @@ class SoundLoader(toga.App):
         # hide keyboard
         self.app.main_window.content = self.app.main_window.content
 
-        # clear textinput and return on 'clear' btn click
+        # pick file action
+        if self.load_button.text == "Add":
+            await self.pick_file_action()
+            return
+
+        # clear input action
         if self.load_button.text == "Clear":
             self.clear_action()
             return
 
-        # paste if text input is empty
+        # paste input action
         if not self.url_input.value:
             await self.paste_action()
             
