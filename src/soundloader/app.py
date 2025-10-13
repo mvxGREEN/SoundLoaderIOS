@@ -21,7 +21,6 @@ from toga.style.pack import COLUMN, ROW, LEFT, CENTER, RIGHT
 from toga.validators import MinLength, StartsWith, Contains
 from mutagen.mp4 import MP4, MP4Cover
 from toga.sources import ListSource
-from toga.constants import FileDialogAction
 
 # ios imports
 if sys.platform == 'ios':
