@@ -324,8 +324,10 @@ class SoundLoader(toga.App):
 
         # If the search term is empty, show all files
         if not search_term:
+            print("not filtering files")
             filtered_data = self.all_files
         else:
+            print("filtering files")
             # 3. Filter the master list
             filtered_data = [
                 file_info
