@@ -542,15 +542,25 @@ class SoundLoader(toga.App):
             self.load_button.text = "Clear"
             self.filter_files(self.search_input)
 
-    def play_m4a_file(self, table, row):
+    def play_m4a_file(self, table):
+        print("play_m4a_file")
         """
         Handles the row selection and initiates playback.
         The 'row' object is the data item from the ListSource that was clicked.
         """
-        if row:
+        selected_row = table.selection
+
+        if isinstance(selected_row, list):
+            # This handles multi-selection if enabled, but we assume single-select here.
+            row_data = selected_row[0]
+        else:
+            row_data = selected_row
+
+        if row_data:
             # The 'row' is the dictionary/object used to populate the ListSource.
             # We access the 'full_path' we stored earlier.
-            file_path = row.full_path
+            file_path = row_data.full_path
+            print(f"playing file at file_path: {file_path}")
             self.play_audio(file_path)
         else:
             # This occurs when the table selection is cleared or if no row is selected
@@ -568,6 +578,8 @@ class SoundLoader(toga.App):
 
             self.player.play()
             print(f"playing audio: {path}")
+        else:
+            print("playback not implemented for this os!")
 
     # paste copied text into url_input
     async def paste_action(self):
