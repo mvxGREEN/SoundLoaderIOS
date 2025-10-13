@@ -598,7 +598,7 @@ class SoundLoader(toga.App):
     async def pick_file_action(self):
         try:
             # Use the platform-native file picker to select a file
-            selected_file = await self.main_window.show_open_dialog(
+            selected_file = await self.main_window.open_file_dialog(
                 title="Select M4A File",
                 initial_directory=self.storage_dir,
                 # iOS-specific file types are handled by the Toga backend
