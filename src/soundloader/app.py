@@ -271,10 +271,14 @@ class SoundLoader(toga.App):
             accessors=['filename', 'full_path'],
             data=[]
         )
+
+        # init ui
+        self.show_init_layout()
+
+        # init scan
         self.initial_scan()
 
-        # update ui
-        self.show_init_layout()
+
 
     # get path to temp directory
     def get_temp_path(self):
