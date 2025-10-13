@@ -591,9 +591,21 @@ class SoundLoader(toga.App):
         self.search_input.value = ""
 
     async def handle_file_pick(self, window, file_paths):
-        print(f"handle_file_paths: len(file_paths)={len(file_paths)}")
+        print(f"scanned files: {len(file_paths)}")
 
-        # TODO add files at file paths to listsource & update ui
+        # 1. Collect all .m4a files into the master list
+        self.all_files = []
+        for file_path in file_paths:
+            if file_path.is_file():
+                self.all_files.append({
+                    'filename': file_path.name,
+                    'full_path': str(file_path)
+                })
+
+        print(f"Total files: {len(self.all_files)}")
+
+        # 2. After a new scan, apply the current filter (which might be empty)
+        self.filter_files(self.search_input)
 
     async def pick_file_action(self):
         try:
