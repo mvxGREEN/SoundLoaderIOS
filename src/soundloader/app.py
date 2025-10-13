@@ -340,7 +340,7 @@ class SoundLoader(toga.App):
 
         # hint_box
         hint_label = toga.Label(
-            "My Music:",
+            "Search:",
             font_family="FiraSans",
             margin=(8, 8, 4, 8),
         )
@@ -602,7 +602,7 @@ class SoundLoader(toga.App):
                     'full_path': str(file_path)
                 })
 
-        print(f"Total files: {len(self.all_files)}")
+        print(f"total files: {len(self.all_files)}")
 
         # 2. After a new scan, apply the current filter (which might be empty)
         self.filter_files(self.search_input)
