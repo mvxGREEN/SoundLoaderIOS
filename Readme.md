@@ -46,8 +46,8 @@ The app accepts a Soundcloud URL (track only) and downloads the track as an .MP4
 2.  Set up your Beeware virtual environment, per the [tutorial]((https://docs.beeware.org/en/latest/tutorial/tutorial-0.html#))
 3.  [Activate](https://docs.beeware.org/en/latest/tutorial/tutorial-0.html#) your beeware virtual environment
 4.  Clone and extract [this](https://github.com/mvxGREEN/SoundLoaderIos) project
-6.  'Cd' into extracted project
-7.  Build the xcode project by with ['create iOS'](https://docs.beeware.org/en/latest/tutorial/tutorial-5/iOS.html) then ['build iOS'](https://docs.beeware.org/en/latest/tutorial/tutorial-5/iOS.html)
+6.  'cd' into extracted project
+7.  Build the xcode project by with ['briefcase create iOS'](https://docs.beeware.org/en/latest/tutorial/tutorial-5/iOS.html) then ['briefcase build iOS'](https://docs.beeware.org/en/latest/tutorial/tutorial-5/iOS.html)
 8.  Open generated 'build' folder and locate .xcodeproj file
 9.  Open .xcodeproj in Xcode
 10.  Build & sign app in xcode
