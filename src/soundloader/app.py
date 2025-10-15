@@ -329,10 +329,37 @@ class SoundLoader(toga.App):
         toga.Font.register("FiraSansBold", "resources/FiraSans-Bold.ttf")
 
         # scan files
-        self.storage_dir: Path = self.paths.data
+        #self.storage_dir: Path = self.paths.data
+        self.storage_dir = Path(get_dest_path())
         if not self.storage_dir.exists():
             self.storage_dir.mkdir(parents=True)
         print(f"scanning files in app dir: {str(self.storage_dir)}")
+        
+        initial_file_name = "sample-1.m4a"
+        destination_path = self.storage_dir / initial_file_name
+        
+        if not destination_path.exists():
+            try:
+                # 1. Determine the path inside the app bundle (read-only source)
+                # This path assumes the file is placed in a 'resources' folder at the project root.
+                source_path = self.paths.app / 'resources' / initial_file_name
+                
+                # 2. Robust copying using read/write if source exists
+                if source_path.exists():
+                    # Read all bytes from the source
+                    file_content = source_path.read_bytes()
+                    # Write all bytes to the destination (Data/Documents folder)
+                    destination_path.write_bytes(file_content)
+                    print(f"Copied initial file: {initial_file_name} to {destination_path}")
+                else:
+                    # Fallback for different bundling strategies
+                    # If using Briefcase/BeeWare, you might need to adjust 'resources' path based on your setup.
+                    print(f"Warning: Initial resource file '{initial_file_name}' not found in app bundle: {source_path}")
+
+            except Exception as e:
+                print(f"Error copying initial file: {e}")
+        else:
+            print(f"Initial file '{initial_file_name}' already exists in documents, skipping copy.")
 
         # files list
         self.all_files = []
@@ -340,7 +367,7 @@ class SoundLoader(toga.App):
 
         # init ui
         self.show_init_layout()
-        
+                
         # create player, audio session, and related fields
         self.player = None
         self.current_playing_path = None # Path of the file currently playing/paused
@@ -427,6 +454,7 @@ class SoundLoader(toga.App):
         """Creates a detailed file row: [Thumbnail] [Title/Subtitle] [Play Button]"""
         
         filename = file_data['filename']
+        title = file_data['title']
         duration = file_data.get('duration', "Unknown duration")
         full_path = file_data['full_path']
         
@@ -452,8 +480,13 @@ class SoundLoader(toga.App):
         )
         
         # subtitle (duration)
+        if title is None:
+            title = ""
+        display_subtitle = title
+        if len(display_subtitle) > 25:
+            display_subtitle = display_subtitle[:25]
         subtitle_label = toga.Label(
-            duration,
+            display_subtitle,
             style=Pack(font_size=10, color='gray', text_align='left')
         )
         
@@ -494,7 +527,7 @@ class SoundLoader(toga.App):
         
         search_term = text_input.value.lower()
         
-        if not search_term:
+        if not search_term or "https:" in search_term:
             filtered_data = self.all_files
         else:
             filtered_data = [
@@ -503,10 +536,10 @@ class SoundLoader(toga.App):
                 if search_term in file_info['filename'].lower()
             ]
 
-        # ⭐️ CORE FIX: Clear the old contents
+        # clear the old contents
         self.file_list_box.clear()
 
-        # ⭐️ Populate the box with new, filtered rows
+        # populate the box with new, filtered rows
         for file_data in filtered_data:
             row = self.create_file_row(file_data)
             self.file_list_box.add(row)
@@ -529,7 +562,7 @@ class SoundLoader(toga.App):
         self.hint_box = toga.Box(children=[hint_label])
         self.main_box.add(self.hint_box)
 
-        # url_box
+        # input box
         self.search_input = toga.TextInput(direction=ROW,
                                            on_confirm=self.start_load_audio,
                                            on_change=self.input_change,
@@ -540,7 +573,7 @@ class SoundLoader(toga.App):
                                                                  allow_empty=True),
                                                        ])
         self.load_button = toga.Button(
-            "Add",
+            "Paste",
             direction=ROW,
             on_press=self.start_load_audio,
             margin=(0, 0, 0, 4),
@@ -551,36 +584,12 @@ class SoundLoader(toga.App):
         self.url_box.add(self.load_button)
         self.main_box.add(self.url_box)
         
-        # container to hold all the file boxes
-        self.file_list_box = toga.Box(
-            style=Pack(direction=COLUMN, padding=0),
-        )
-
-        # scrollable area for the list
-        self.scroll_container = toga.ScrollContainer(
-            content=self.file_list_box,
-            style=Pack(flex=1)
-        )
-        self.main_box.add(self.scroll_container)
-        
-        # main_window
-        self.main_window = toga.MainWindow(title="SoundLoader")
-        self.main_window.content = self.main_box
-        self.main_window.show()
-
-    def show_loading_layout(self):
-        # set load_button to loading
-        self.load_button.text = "Loading…"
-
-        # set download_button to download
-        self.download_button.text = "Download"
-        
         # preview_box
         self.preview_box = toga.Box(direction=COLUMN)
         self.main_box.add(self.preview_box)
 
         # image_box
-        self.image_view = toga.ImageView(image=None, height=320, direction=COLUMN, flex=1)
+        self.image_view = toga.ImageView(image=None, height=160, direction=COLUMN, flex=1)
         self.image_box = toga.Box(children=[self.image_view], direction=COLUMN, margin=8)
         self.preview_box.add(self.image_box)
 
@@ -614,12 +623,124 @@ class SoundLoader(toga.App):
         self.filename_input_label.style.visibility = 'hidden'
         self.filename_input.style.visibility = 'hidden'
         self.download_button.style.visibility = 'hidden'
+        
+        # container to hold all the file boxes
+        self.file_list_box = toga.Box(
+            style=Pack(direction=COLUMN, padding=0),
+        )
+
+        # scrollable area for the list
+        self.scroll_container = toga.ScrollContainer(
+            content=self.file_list_box,
+            style=Pack(flex=1)
+        )
+        self.main_box.add(self.scroll_container)
+        
+        # main_window
+        self.main_window = toga.MainWindow(title="SoundLoader")
+        self.main_window.content = self.main_box
+        self.main_window.show()
+        
+    def show_clear_layout(self):
+        # main_box
+        self.main_box = toga.Box(direction=COLUMN)
+
+        # hint_box
+        hint_label = toga.Label(
+            "Search:",
+            font_family="FiraSans",
+            margin=(8, 8, 4, 8),
+        )
+        self.hint_box = toga.Box(children=[hint_label])
+        self.main_box.add(self.hint_box)
+
+        # input box
+        self.search_input = toga.TextInput(direction=ROW,
+                                           on_confirm=self.start_load_audio,
+                                           on_change=self.input_change,
+                                           flex=1,
+                                           validators=[StartsWith("https://", error_message="Please paste a valid URL",
+                                                                  allow_empty=True),
+                                                       MinLength(15, error_message="Please paste a valid URL",
+                                                                 allow_empty=True),
+                                                       ])
+        self.load_button = toga.Button(
+            "Paste",
+            direction=ROW,
+            on_press=self.start_load_audio,
+            margin=(0, 0, 0, 4),
+        )
+        self.load_button.style.visibility = 'visible'
+        self.url_box = toga.Box(margin=(0, 8))
+        self.url_box.add(self.search_input)
+        self.url_box.add(self.load_button)
+        self.main_box.add(self.url_box)
+        
+        # preview_box
+        self.preview_box = toga.Box(direction=COLUMN)
+        self.main_box.add(self.preview_box)
+
+        # image_box
+        self.image_view = toga.ImageView(image=None, height=160, direction=COLUMN, flex=1)
+        self.image_box = toga.Box(children=[self.image_view], direction=COLUMN, margin=8)
+        self.preview_box.add(self.image_box)
+
+        # filename_box
+        self.filename_input_label = toga.Label(
+            "Filename:",
+            font_family="FiraSans",
+            margin=(12, 4, 8, 12)
+        )
+        self.filename_input = toga.TextInput(margin=(8, 12, 8, 4), direction=ROW, flex=1)
+        filename_box = toga.Box(direction=ROW)
+        filename_box.add(self.filename_input_label)
+        filename_box.add(self.filename_input)
+        self.preview_box.add(filename_box)
+
+        # download_box
+        self.download_button = toga.Button(
+            "Download",
+            on_press=self.start_download_audio,
+            margin=8,
+        )
+        download_box = toga.Box(children=[self.download_button], direction=COLUMN)
+        self.preview_box.add(download_box)
+
+        # progress_box
+        self.progress = toga.ProgressBar(max=None, direction=ROW, flex=1)
+        self.progress.style.visibility = 'hidden'
+        progress_box = toga.Box(children=[self.progress], direction=COLUMN)
+        self.preview_box.add(progress_box)
+        self.image_view.style.visibility = 'hidden'
+        self.filename_input_label.style.visibility = 'hidden'
+        self.filename_input.style.visibility = 'hidden'
+        self.download_button.style.visibility = 'hidden'
+        
+        # container to hold all the file boxes
+        self.file_list_box = toga.Box(
+            style=Pack(direction=COLUMN, padding=0),
+        )
+
+        # scrollable area for the list
+        self.scroll_container = toga.ScrollContainer(
+            content=self.file_list_box,
+            style=Pack(flex=1)
+        )
+        self.main_box.add(self.scroll_container)
+        
+        # set window content
+        self.main_window.content = self.main_box
+
+    def show_loading_layout(self):
+        # set load_button to loading
+        self.load_button.text = "Loading…"
+        
         # disable clickable widgets
         self.search_input.enabled = False
         self.filename_input.enabled = False
         self.load_button.enabled = False
         self.download_button.enabled = False
-
+        
         # hide preview widgets
         self.image_view.style.visibility = 'hidden'
         self.filename_input_label.style.visibility = 'hidden'
@@ -649,6 +770,7 @@ class SoundLoader(toga.App):
         finally:
             # set load_button to clear
             self.load_button.text = "Clear"
+            self.download_button.text = "Download"
 
             # enable clickable widgets
             self.search_input.enabled = True
@@ -683,10 +805,6 @@ class SoundLoader(toga.App):
         # set download_button to finished
         self.download_button.text = "Finished!"
         
-        # TODO remove downloader boxes and widgets
-        
-        # TODO add new file to list
-
         # stop progress bar
         self.progress.stop()
         self.progress.max = 100
@@ -703,7 +821,7 @@ class SoundLoader(toga.App):
             print("url_input cleared")
 
             # reset main button
-            self.load_button.text = "Add"
+            self.load_button.text = "Paste"
 
             # reset progress
             self.progress.value = 0
@@ -809,9 +927,11 @@ class SoundLoader(toga.App):
     def clear_action(self):
         print("clear_action")
         self.search_input.value = ""
+        # reset window content
+        #self.show_clear_layout()
 
     async def handle_file_pick(self, window, file_paths):
-        print(f"scanned files: {len(file_paths)}")
+        print(f"number of picked files: {len(file_paths)}")
 
         # 1. Collect all .m4a files into the master list
         # self.all_files = []
@@ -1124,19 +1244,22 @@ class SoundLoader(toga.App):
         # hide keyboard
         self.app.main_window.content = self.app.main_window.content
 
+        # check for copied link
+        if sys.platform == 'ios' and not UIPasteboard.generalPasteboard.string is None and "https" in str(UIPasteboard.generalPasteboard.string) and not self.load_button.text == "Clear":
+                await self.paste_action()
         # pick file action
-        if self.load_button.text == "Add":
+        elif self.load_button.text == "Add":
             await self.pick_file_action()
             return
 
         # clear input action
-        if self.load_button.text == "Clear":
+        elif self.load_button.text == "Clear":
             self.clear_action()
             return
 
         # paste input action
-        if not self.search_input.value:
-            await self.paste_action()
+        #if not self.search_input.value:
+        #    await self.paste_action()
 
         # validate input
         if "soundcloud.com" not in self.search_input.value:
@@ -1250,12 +1373,12 @@ class SoundLoader(toga.App):
         print(f"finished download_audio task")
 
         # get path to saved file
-        file_path_dest = get_dest_path() + f"{self.filename_input.value}" + ".mp4"
+        file_path_dest = get_dest_path() + f"{self.filename_input.value}" + ".m4a"
         print(f"file_path_dest={file_path_dest}")
 
     # (2) asynchronously download audio
     async def download_audio(self, og_url, dest_path, filename):
-        print(f"start download_audio: dest_path={dest_path}, filename={filename}")
+        print(f"start download_audio: og_url={og_url} dest_path={dest_path}, filename={filename}")
 
         global chunk_urls
         global thumbnail_filename
@@ -1264,6 +1387,7 @@ class SoundLoader(toga.App):
         global track_filename
 
         # download playlist
+        print(f"downloading from playlist url: playlist_url={playlist_url}")
         playlist_path = await download_m3u_file(playlist_url, str(self.get_temp_path()), filename)
         print(f"finished playlist download: playlist_path={playlist_path}")
 
@@ -1301,7 +1425,7 @@ class SoundLoader(toga.App):
             if index != 0:
                 chunkpath = str(self.get_temp_path()) + "/chunk" + str(index) + file_ext
                 chunk_paths.append(chunkpath)
-        dest_filepath = get_dest_path() + track_filename + ".mp4"
+        dest_filepath = get_dest_path() + track_filename + ".m4a"
 
         # start concatenating
         success = await self.concatenate_m4_segments(chunk_paths, dest_filepath)
@@ -1406,9 +1530,12 @@ class SoundLoader(toga.App):
             # audio['©day'] = [track_year]
             # audio['©gen'] = [track_genre]
 
-            # 6. Save the changes to the file
+            # save metadata to tags
             audio.save()
             print(f"Successfully set tags on: {audio_file_path}")
+            
+            # add file to UI
+            await self.handle_file_pick(self.main_window, [Path(audio_file_path)])
 
         except FileNotFoundError:
             print("Error: Audio or image file not found.")
